@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Locator Inspector — Install</title>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0a0c0f; --surface:#12151b; --raised:#1a1e26; --line:#242a34; --line2:#2f3644;
+    --fg:#eef1f5; --dim:#8b93a1; --code:#9ad6ff;
+    --cyan:#00ace0; --green:#00d452;
+    --ship:#4ec98a; --watch:#f2c341; --stop:#f0645a;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important} }
+  body{background:var(--bg);color:var(--fg);margin:0;padding:0;font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:800px;margin:0 auto;padding:0 22px 90px}
+  a{color:inherit}
+  ::selection{background:rgba(0,172,224,.35);color:#fff}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:4px}
+
+  /* ================= Topbar: the SAME gradient hairline the in-app panel uses. ================= */
+  .topbar{height:5px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--green),var(--cyan));
+    background-size:200% 100%;animation:flow 6s linear infinite}
+  @keyframes flow{to{background-position:-200% 0}}
+
+  /* ================= Sticky tab nav: the exact six tabs the tool itself has. Not decoration --
+     these anchors are structurally true to the product, so they double as a map of it. ================= */
+  .tabnav{position:sticky;top:0;z-index:5;display:flex;gap:2px;overflow-x:auto;
+    background:rgba(10,12,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+    padding:0 22px}
+  .tabnav a{flex:none;position:relative;padding:13px 15px;font:600 12.5px/1 var(--mono);
+    color:var(--dim);text-decoration:none;letter-spacing:.02em;white-space:nowrap}
+  .tabnav a::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;
+    background:linear-gradient(90deg,var(--cyan),var(--green));background-size:200% 100%;
+    opacity:0;transition:opacity .18s}
+  .tabnav a:hover{color:var(--fg);text-shadow:0 0 10px rgba(0,172,224,.5)}
+  .tabnav a:hover::after{opacity:1;animation:flow 1.6s linear infinite}
+
+  /* ================= Hero: clean, no overlapping ornament -- a gradient headline is signature
+     enough on its own; nothing here can collide with the copy below it. ================= */
+  header{padding:64px 0 8px}
+  .kicker{display:block;font:700 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:20px}
+  .kicker b{color:var(--green)}
+  h1{font-family:var(--mono);font-weight:800;font-size:3.1rem;line-height:1.02;margin:0 0 20px;
+    letter-spacing:-.03em;
+    background:linear-gradient(100deg,var(--fg) 55%,var(--cyan) 85%,var(--green));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hook{font-family:var(--mono);font-weight:800;font-size:1.35rem;letter-spacing:-.01em;
+    margin:0 0 16px;
+    background:linear-gradient(100deg,var(--cyan),var(--green));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{color:var(--dim);font-size:1.08rem;max-width:58ch;margin:0 0 30px}
+  .lede b{color:var(--fg);font-weight:650}
+
+  .counts{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 8px}
+  .count{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:12px 15px;flex:1 1 200px}
+  .count b{display:block;font:800 15px/1.3 var(--sans);color:var(--fg);margin-bottom:3px}
+  .count span{font-size:12px;color:var(--dim);line-height:1.4}
+
+  section{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:26px 28px;margin:22px 0;scroll-margin-top:56px}
+  section h2{font-family:var(--mono);font-size:1.02rem;margin:0 0 14px;color:var(--fg);
+    font-weight:750;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+  section h2 .tabdot{width:8px;height:8px;border-radius:50%;flex:none;
+    background:linear-gradient(135deg,var(--cyan),var(--green))}
+  section h3{font-size:.86rem;margin:20px 0 10px;color:var(--code);font-weight:650;letter-spacing:.01em}
+  section h3:first-child{margin-top:0}
+  section p{color:#c6ccd6;margin:0 0 12px}
+  section p:last-child{margin-bottom:0}
+  .chain{color:var(--dim);font-size:.86rem;margin:0 0 16px;font-family:var(--mono)}
+  .chain b{color:var(--code);font-weight:600}
+  ul{color:#c6ccd6;padding-left:20px;margin:0}
+  li{margin-bottom:9px}
+  li:last-child{margin-bottom:0}
+  b,strong{color:var(--fg);font-weight:650}
+
+  .drag{display:inline-block;background:linear-gradient(135deg,var(--cyan),var(--green));color:#04140b;
+    font-weight:800;padding:16px 30px;border-radius:11px;text-decoration:none;font-size:.98rem;
+    cursor:grab;box-shadow:0 10px 26px rgba(0,172,224,.28);border:1px solid rgba(255,255,255,.25)}
+  .drag:active{cursor:grabbing}
+  .drag.shake{animation:dragshake .4s ease}
+  @keyframes dragshake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+  .drag-hint{display:inline-block;margin-left:12px;padding:10px 14px;background:var(--raised);
+    border:1px solid var(--watch);border-radius:9px;color:#f2c341;font-size:.86rem;font-weight:600;
+    max-width:360px;vertical-align:middle;opacity:0;transform:translateX(-6px);
+    transition:opacity .2s,transform .2s;pointer-events:none}
+  .drag-hint.show{opacity:1;transform:translateX(0)}
+  .after-drag{color:var(--dim);font-size:.86rem;margin-top:15px}
+
+  code,kbd{font-family:var(--mono);font-size:.86em}
+  code{background:var(--raised);padding:2px 6px;border-radius:4px;color:var(--code);
+    overflow-wrap:anywhere;word-break:break-word}
+  kbd{background:var(--raised);border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:5px;padding:2px 7px;color:var(--fg);font-weight:600;white-space:nowrap}
+  pre{background:#07090c;border:1px solid var(--line);border-radius:9px;padding:13px 15px;
+    overflow-x:auto;margin:12px 0}
+  pre code{background:none;padding:0;font-size:12.5px;line-height:1.6;white-space:pre;
+    overflow-wrap:normal;word-break:normal}
+  .dim{color:var(--dim);font-size:.9rem}
+
+  .chip{display:inline-block;font-size:.74rem;font-weight:650;white-space:nowrap;
+    padding:2px 7px;border-radius:5px;color:#cfe0ff;background:rgba(0,172,224,.13);
+    border:1px solid rgba(0,172,224,.36)}
+  .chip.warn{color:#f4d98a;background:rgba(242,195,65,.11);border-color:rgba(242,195,65,.36)}
+
+  .verdicts{display:grid;gap:9px;margin-top:4px}
+  .v{display:grid;grid-template-columns:auto 1fr;gap:13px;align-items:baseline;
+    background:var(--raised);border:1px solid var(--line);border-left-width:3px;
+    border-radius:8px;padding:11px 14px}
+  .v.ship{border-left-color:var(--ship)} .v.watch{border-left-color:var(--watch)}
+  .v.stop{border-left-color:var(--stop)}
+  .v .tag{font:800 10.5px/1 var(--mono);letter-spacing:.06em;padding:5px 8px;border-radius:5px;
+    white-space:nowrap;color:#0d0f13}
+  .v.ship .tag{background:var(--ship)} .v.watch .tag{background:var(--watch)}
+  .v.stop .tag{background:var(--stop)}
+  .v p{margin:0;font-size:.9rem;color:#c6ccd6}
+
+  table{width:100%;border-collapse:collapse;margin-top:4px}
+  td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:baseline;font-size:.91rem;color:#c6ccd6}
+  tr:last-child td{border-bottom:0}
+  td:first-child{width:110px;white-space:nowrap;padding-right:14px}
+  @media (max-width:560px){
+    table,tbody,tr,td{display:block;width:auto}
+    td{border-bottom:0;padding:3px 0}
+    tr{border-bottom:1px solid var(--line);padding:8px 0}
+    tr:last-child{border-bottom:0}
+    td:first-child{width:auto;white-space:normal;padding-right:0;color:var(--fg);font-weight:600}
+  }
+
+  .flag{border-left:3px solid var(--watch);background:rgba(242,195,65,.06);
+    border-radius:0 8px 8px 0;padding:13px 16px;margin:12px 0 0}
+  .flag p{margin:0;font-size:.9rem}
+  .flag .h{font-weight:700;color:var(--watch);font-size:.82rem;letter-spacing:.03em;
+    text-transform:uppercase;font-family:var(--mono);display:block;margin-bottom:5px}
+
+  /* ================= "What sets this apart": the tool's own signature reticle marks the
+     one column that's actually verified, the same way it marks the one element on a page
+     that's actually 1-of-1 -- used ONLY here, on a single-line header, where it can't
+     collide with anything else. ================= */
+  .compare{overflow-x:auto;margin-top:6px}
+  .compare table{min-width:560px}
+  .compare th{text-align:left;font:700 11.5px/1 var(--mono);letter-spacing:.03em;
+    text-transform:uppercase;color:var(--dim);padding:0 0 12px;border-bottom:1px solid var(--line2)}
+  .compare th.us{color:var(--fg);position:relative}
+  .compare th.us::before,.compare th.us::after{content:"";position:absolute;width:14px;height:14px;
+    border:1.5px solid var(--cyan);opacity:.6}
+  .compare th.us::before{top:-8px;left:-4px;border-right:0;border-bottom:0}
+  .compare th.us::after{top:-8px;right:-4px;border-left:0;border-bottom:0}
+  .compare td{font-size:.87rem;padding:10px 14px 10px 0}
+  .compare td:first-child{width:auto;white-space:normal;color:#c6ccd6;font-weight:500}
+  .compare td.us{color:var(--fg);font-weight:650;background:linear-gradient(90deg,rgba(0,172,224,.07),rgba(0,212,82,.05))}
+  .compare td.no{color:var(--dim)}
+
+  /* ================= Six capability cards -- structural because there really are six tabs,
+     not a decorative number. One card per tab, same order as the nav above. ================= */
+  .sig{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}
+  .sigcard{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .sigcard b{display:block;font:700 .84rem/1.3 var(--sans);color:var(--fg);margin-bottom:4px}
+  .sigcard span{font-size:.8rem;color:var(--dim)}
+
+  footer{color:var(--dim);font-size:.84rem;margin-top:36px;text-align:center;padding-top:26px;
+    border-top:1px solid var(--line)}
+  footer .credit{display:block;margin-top:8px;font-family:var(--mono);font-size:.78rem;letter-spacing:.02em}
+  footer .credit b{color:var(--fg)}
+  footer .credit .co{color:var(--cyan)}
+
+  @media (max-width:560px){
+    h1{font-size:2.1rem} section{padding:20px 18px} header{padding:44px 0 4px}
+    .wrap{padding:0 16px 70px}
+    td:first-child{width:88px}
+  }
+</style>
+</head>
+<body>
+<div class="topbar" aria-hidden="true"></div>
+<nav class="tabnav" aria-label="Jump to a tab's explanation">
+  <a href="#inspect">Inspect</a>
+  <a href="#health">Health</a>
+  <a href="#record">Record</a>
+  <a href="#learn">Learn</a>
+  <a href="#doctor">Doctor</a>
+  <a href="#feed">Feed</a>
+</nav>
+<div class="wrap">
+
+  <header>
+    <span class="kicker">Securiti QA · zero install · nothing leaves <b>the</b> browser</span>
+    <h1>Locator<br>Inspector</h1>
+    <p class="hook">Hover. Verify. Ship.</p>
+    <p class="lede">Stop copy-pasting a selector and hoping it survives the next render. Hover
+    any element, anywhere in the product, and get a Playwright locator that's already been
+    <b>executed against the live DOM</b> and proven to match exactly one node — plus the CSS
+    line, and the exact count you'll get when you paste it into DevTools. Nothing here is
+    predicted or guessed. It's measured, live, on every page, every single time.</p>
+
+    <div class="counts">
+      <div class="count"><b>Verified, not guessed</b><span>every locator is actually run against the page before it's ever shown to you</span></div>
+      <div class="count"><b>Works across the whole app</b><span>same engine on every page and every embedded module, not a one-off script for one screen</span></div>
+      <div class="count"><b>Nothing leaves your browser</b><span>runs as a bookmarklet — no install, no server, no data sent anywhere</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>What sets this apart</h2>
+    <p>Most locator tooling falls into one of two camps: a manual point-and-click inspector that
+    hands you whatever the DOM happened to look like at that instant, or a "self-healing" layer
+    that quietly rewrites your selectors later and hides how often it's actually guessing. This
+    takes a different position — verify before you ever see it, keep re-verifying for as long as
+    you keep working, and say exactly why a locator is trustworthy or not instead of just handing
+    one over.</p>
+    <div class="compare">
+      <table>
+        <tr><th>Typical approach</th><th class="us">This tool</th></tr>
+        <tr><td class="no">Click one static element, get one guess</td><td class="us">Hover → verified 1-of-1 against the live page, escalating automatically until it's genuinely unique</td></tr>
+        <tr><td class="no">Breaks silently, discovered only when a run fails</td><td class="us">Re-checked continuously in the background, flagged <b>Stable / At-risk / Flaky</b> before you ever ship it</td></tr>
+        <tr><td class="no">Manual frame-switching and guesswork</td><td class="us">Every embedded module on the page is detected automatically — told to you plainly, not discovered by a failed run</td></tr>
+        <tr><td class="no">A separate code-generation tool to learn and maintain</td><td class="us">Locating and recording live in the same tool, producing a runnable spec straight from real usage</td></tr>
+        <tr><td class="no">No memory between sessions</td><td class="us">Learns this app's own conventions locally over time — nothing to configure, nothing leaves the browser</td></tr>
+        <tr><td class="no">Hand-written selectors for repeated rows or lists</td><td class="us">Automatically scopes a chain for duplicate rows, with both ends independently verified unique</td></tr>
+      </table>
+    </div>
+    <div class="sig">
+      <div class="sigcard"><b>Inspect</b><span>Hover any element, anywhere → a verified locator, live</span></div>
+      <div class="sigcard"><b>Health</b><span>Watches what you actually rely on, flags a break the instant it happens</span></div>
+      <div class="sigcard"><b>Record</b><span>Turns real usage into a runnable, verified test script</span></div>
+      <div class="sigcard"><b>Learn</b><span>Remembers this app's own conventions across every session</span></div>
+      <div class="sigcard"><b>Doctor</b><span>Diagnoses a failing locator, segment by segment</span></div>
+      <div class="sigcard"><b>Feed</b><span>Every toast and error, caught the instant it renders</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="tabdot" aria-hidden="true"></span>Step 1 — Drag this to your bookmarks bar</h2>
+    <p>Press <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> first if the bar is hidden
+    (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> on Windows).</p>
+    <a class="drag" id="dragBtn" href="BOOKMARKLET_URI_PLACEHOLDER" onclick="showDragHint(); return false;">🔍 Locator Inspector</a>
+    <span id="dragHint" class="drag-hint">👆 Drag it — a click here does nothing on purpose (see below). Press and hold, then drag up onto your bookmarks bar.</span>
+    <p class="after-drag">Clicking it <em>here</em> does nothing on purpose — it only runs once it's
+    a bookmark and you click it on the page you want to inspect. If the drag misbehaves,
+    right-click the bar → <b>Add page</b> → paste the contents of <code>bookmarklet.txt</code>
+    as the URL.</p>
+  </section>
+  <script>
+    function showDragHint() {
+      var el = document.getElementById('dragHint');
+      var btn = document.getElementById('dragBtn');
+      el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+      btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+      clearTimeout(window.__dragHintTimer);
+      window.__dragHintTimer = setTimeout(function () { el.classList.remove('show'); }, 4200);
+    }
+  </script>
+
+  <section>
+    <h2><span class="tabdot" aria-hidden="true"></span>Step 2 — Open any page and click the bookmark</h2>
+    <p>A panel appears bottom-right. Click the bookmark again, or the ✕, to remove it completely —
+    it restores <code>fetch</code>, XHR and history exactly as they were.</p>
+    <p>Now hover any button, link, input, row or banner, on any page in the app. Two copyable lines
+    every time: the <b>Playwright locator</b> and the <b>CSS selector</b>.</p>
+    <p>Every line is clickable, and every line has a keyboard shortcut so you never have to
+    chase the card with the mouse:</p>
+    <table>
+      <tr><td><kbd>Alt</kbd>+<kbd>P</kbd></td><td>copy the Playwright locator</td></tr>
+      <tr><td><kbd>Alt</kbd>+<kbd>C</kbd></td><td>copy the CSS selector</td></tr>
+      <tr><td><kbd>Alt</kbd>+<kbd>F</kbd></td><td>copy the <code>frameLocator()</code> form — the one to use when your test
+      starts at the main app shell rather than opening that embedded module's own URL directly</td></tr>
+      <tr><td><kbd>Alt</kbd>+<kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></td><td>copy the 1st / 2nd / 3rd
+      <b>verified alternative</b> listed under the main lines</td></tr>
+      <tr><td><kbd>Alt</kbd>+<kbd>Z</kbd></td><td>step one element <em>outward</em>. Your cursor sits on top of
+      several nested elements; if you got the icon and wanted the button, press this</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>close the tooltip</td></tr>
+    </table>
+  </section>
+
+  <section id="inspect">
+    <h2><span class="tabdot" aria-hidden="true"></span>Inspect — the hover tooltip</h2>
+    <p class="chain">the chain: <b>hover</b> → resolve against the live DOM → grade the result → show every copyable form</p>
+    <p>Every element gets escalated through the same ladder a careful engineer would use by hand —
+    test hook, then role + accessible name, then label/placeholder, then a scoped chain for
+    duplicate rows, then CSS as a last resort — and stops at the first one verified unique against
+    the live page. A heatmap and CSV export cover the whole page at once, not one element at a time.</p>
+
+    <h3>Two Playwright lines? Pick by where your test starts</h3>
+    <p>When the element you're hovering lives inside a module embedded from a different origin,
+    you can get two Playwright forms, not one. They end in the identical chain — the
+    <em>prefix</em> is the whole difference, and the tooltip highlights it:</p>
+    <table>
+      <tr><td><span class="chip">test opens that module's URL directly</span></td>
+          <td><code>page.locator('…')</code> — your spec navigates straight to that module</td></tr>
+      <tr><td><span class="chip warn">test starts at the app shell</span></td>
+          <td><code>page.frameLocator('iframe[src*="…"]').locator('…')</code> —
+          your spec logs in and navigates into the module from there</td></tr>
+    </table>
+    <p>Get this wrong and the locator returns <b>0 matches</b> with no error explaining why:
+    <code>page.locator()</code> cannot see inside a frame. That single mistake is the most common
+    reason a "correct" locator appears broken.</p>
+    <p><b>While you're actually recording, only one of these shows.</b> Mid-recording, the tool
+    already knows which one your test needs — there's a real <code>page.goto()</code> into this exact
+    origin sitting in the script by then, either from starting the recording there or from the
+    cross-origin handoff described under Record — so there's nothing left to guess. Outside a
+    recording (just hovering to grab a locator for a test you're writing by hand) both stay shown,
+    because there the tool has no way to know which one your target test actually uses.</p>
+
+    <h3>Read the verdict, not a letter grade</h3>
+    <div class="verdicts">
+      <div class="v ship"><span class="tag">SHIP IT</span>
+        <p>Pinned on a test hook, or on role + accessible name. Put it in a test.</p></div>
+      <div class="v watch"><span class="tag">WORKS — WATCH IT</span>
+        <p>Resolves 1-of-1 today, but pinned on markup or wording. It breaks when either changes,
+        and the tooltip says which.</p></div>
+      <div class="v stop"><span class="tag">DON'T SHIP</span>
+        <p>Not unique, purely positional, or a third-party widget rather than your app.</p></div>
+    </div>
+    <p style="margin-top:14px">Underneath sits a <b>needs</b> row — what the <em>test</em> has to do,
+    a separate question from whether the locator is good. A perfect locator can still need one:
+    <code>open-container</code> (it's in a collapsed menu — the tooltip hands you the click that
+    reveals it), <code>needs-framelocator</code>, <code>click-wrapper</code>,
+    <code>not-clickable</code>, <code>pierces-shadow</code>, <code>third-party-widget</code>.</p>
+
+    <h3>Cross-checking the CSS in DevTools</h3>
+    <p><kbd>Alt</kbd>+<kbd>C</kbd>, then <kbd>Cmd</kbd>+<kbd>F</kbd> in the Elements panel, paste.
+    The tooltip already told you the number you'll get — measured against shadow boundaries,
+    cross-origin iframes, and page-text substring matches, the same three things that make
+    DevTools search harder than <code>querySelectorAll</code>.</p>
+  </section>
+
+  <section id="health">
+    <h2><span class="tabdot" aria-hidden="true"></span>Health — watches what you actually rely on</h2>
+    <p class="chain">the chain: <b>touch it</b> (hover, copy, or record) → tracked → re-checked only when the real page changes → toast the instant it breaks</p>
+    <p>Hovering, copying, or recording a click on something adds it to a watch list. A background
+    observer re-checks every watched locator whenever the app's own DOM actually changes — switching
+    this tool's own tabs, or one of its own toasts appearing, is filtered out and never triggers a
+    wasted re-check. Only real page changes count.</p>
+    <p><b>Ambiguous</b> means it was 1-of-1 and now matches several — the one failure that makes a
+    passing test click the wrong thing. You get a toast the moment it happens, not just a number
+    buried in a tab you have to remember to check. <b>Off-page</b> just means the element isn't on
+    the pages visited since — that's a fact about your browsing, not a defect in the locator, and
+    it's tracked separately so it never gets confused with an actual break.</p>
+  </section>
+
+  <section id="record">
+    <h2><span class="tabdot" aria-hidden="true"></span>Record — turns using the app into a test</h2>
+    <p class="chain">the chain: <b>Start recording</b> → every click/fill/select/check/press becomes a verified step → cross-origin hop auto-detected → hand off, resume, keep going → Stop → export</p>
+    <p>Every action gets the SAME 1-of-1 verified locator Inspect would give you, not a raw
+    positional selector — and the best one wins if a field's grade improves mid-flow (an
+    autocomplete opening, say), rather than locking in whatever was available on the very first
+    keystroke. <kbd>Undo</kbd> drops the last step, <kbd>Redo</kbd> brings it back, <kbd>Clear</kbd>
+    starts over. Export as a flat Generic script or a Page-Object-style Company script — same
+    recording, two shapes.</p>
+
+    <h3>One thing that will confuse you</h3>
+    <div class="flag">
+      <span class="h">Some modules load in a cross-origin iframe</span>
+      <p>No bookmarklet can reach inside one — that's a browser rule, not a gap in this tool. Click it
+      on the shell and you get the shell: nav, launcher, panels, banners, toasts. To inspect or record
+      inside that module, open it in its own tab and click the bookmark there — or use the amber
+      banner's <b>Record in X instead</b> button, which opens the new tab, carries everything recorded
+      so far into it automatically, and resumes recording the instant you click the bookmark there
+      once. That one click can't be skipped: a script can't inject itself into a tab it has no
+      handle to.</p>
+    </div>
+    <p style="margin-top:13px">Either route, the locators come back <b>already wrapped</b> in the
+    right <code>frameLocator(...)</code> call when your test starts at the shell — nothing for you
+    to add by hand, and nothing recorded silently: recording from the shell while working inside
+    the module would otherwise skip those steps with no error and no gap marker, so the Record tab
+    warns you before you press the button, every time.</p>
+
+    <h3>Recorded a flow? Two edits before you run it</h3>
+    <pre><code>test('TODO rename: ...')       →  give it a real name
+const data = { step3: '...' }  →  your test data, hoisted in one place
+// ASSERT (enable + edit):     →  uncomment and fill in</code></pre>
+    <p>The recorder captures what you <em>did</em>, never what you were <em>checking</em>.
+    A recording with no assertions passes as long as nothing crashes — that's a script, not a test.</p>
+    <p>Landing on the login wall on replay? Add <code>await page.pause()</code> after the
+    <code>page.goto(...)</code>: the run opens a real browser and waits, you log in by hand, hit
+    <b>Resume</b>, and the rest executes.</p>
+  </section>
+
+  <section id="learn">
+    <h2><span class="tabdot" aria-hidden="true"></span>Learn — the memory that carries over</h2>
+    <p class="chain">the chain: <b>quietly accumulate</b> good locators as you browse → <b>copy one</b> → promoted to Approved → recalled instantly next time → cleaned up on your terms, never silently</p>
+    <p>Every locator this tool derives is quietly measured against a quality bar — a URN, a real
+    test hook, role + accessible name — never a positional guess — and the good ones accumulate
+    locally in this browser, across sessions, without you doing anything. Copy one on purpose
+    (<kbd>Alt</kbd>+<kbd>P</kbd>, an alternative row, however) and it's promoted to <b>Approved</b>:
+    the next time you're back on that exact element, it's recalled instantly instead of re-derived.</p>
+    <p>Approved something by mistake? Remove <em>that one</em> — no need to wipe everything you've
+    ever learned for this site. <b>Clear stale</b> only ever touches entries that are both unused for
+    30+ days <em>and</em> low-confidence — a URN pin from three months ago, or anything you've
+    reconfirmed more than once, survives regardless of age. This report is also what you hand a
+    developer: which <code>data-testid</code> values this build actually defines versus which have
+    rendered in your session so far.</p>
+  </section>
+
+  <section id="doctor">
+    <h2><span class="tabdot" aria-hidden="true"></span>Doctor — "this locator isn't working, why?"</h2>
+    <p class="chain">the chain: <b>paste, or let it auto-populate</b> → every segment run against the live page → the exact point it stops matching → verified alternatives, one click to copy</p>
+    <p>Paste a failing locator, press <b>Check this locator</b>, and every segment is run against the
+    live page so you can see the exact point it stops matching. Three input forms are accepted and it
+    detects which is which:</p>
+    <table>
+      <tr><td>Playwright chain</td><td><code>page.getByRole('button', { name: 'Save' })</code></td></tr>
+      <tr><td>plain CSS selector</td><td><code>[data-row-key="urn:li:…"] button</code> — paste the
+      <kbd>Alt</kbd>+<kbd>C</kbd> line straight back in</td></tr>
+      <tr><td>XPath</td><td><code>//button[contains(text(),'Save')]</code></td></tr>
+    </table>
+    <p>The headline answers one question — <em>does it find the element?</em> <code>matches 1</code> is a
+    pass even when that element happens to be hidden or unclickable right now; those are reported
+    separately underneath, because they're facts about the <em>page</em>, not the locator.
+    <b>Check it on the screen where it's meant to work</b> — a locator for a dialog reads as "finds
+    nothing" while the dialog is closed, and that's the correct answer.</p>
+    <p><b>You don't always have to paste anything.</b> Anything you copied or used in a recording
+    that later goes ambiguous shows up automatically at the top of this tab as "Needs checkup" — click
+    it to run the diagnosis immediately, or dismiss it if it's not worth chasing right now. Locators
+    you only ever hovered — never copied or recorded — don't clutter this list; Health still tracks
+    those, this tab is just the ones you actually relied on.</p>
+  </section>
+
+  <section id="feed">
+    <h2><span class="tabdot" aria-hidden="true"></span>Feed — every toast, caught the instant it appears</h2>
+    <p class="chain">the chain: <b>a message renders</b> → captured immediately, even sub-second ones → matched to the API call that fired moments earlier → one entry, not two things to correlate by hand</p>
+    <p>Toasts, banners, and validation messages get caught the moment they appear, not on a polling
+    interval that misses the ones that vanish fast. Each one is linked to the network or GraphQL call
+    that triggered it, so an error message and its cause show up together — you're not left
+    cross-referencing a timestamp against a separate network tab by eye.</p>
+  </section>
+
+  <section>
+    <h2>Why a bookmarklet, and what it never does</h2>
+    <p>Extensions need IT approval and are blocked outright in managed browsers like Island. This is a
+    link in your bookmarks bar — no install, no permissions prompt, no policy exception, and it works
+    the same way on every page of the app, not just the one it happened to be built against.</p>
+    <p><b>Nothing leaves the browser.</b> Captured URLs are redacted to host + path with id-like
+    segments masked plus the GraphQL operation name; no request or response bodies are ever read.
+    The recorder masks password, card and OTP fields. What it learns is stored in local IndexedDB and
+    <b>Learn → Clear all stored data</b> erases it. Every DOM and network hook is wrapped so a bug in
+    this tool cannot throw into the app's console, block navigation, or break its requests.</p>
+  </section>
+
+  <footer>
+    Locator Inspector v1.0 · <code>overlay.js</code> is the whole tool
+    <span class="credit">Built by <b>Muhammad Moiz Siddiqui</b> · <span class="co">Securiti QA</span> · a Veeam company</span>
+  </footer>
+</div>
+</body>
+</html>

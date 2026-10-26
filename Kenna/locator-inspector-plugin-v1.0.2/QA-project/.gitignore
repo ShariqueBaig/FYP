@@ -1,0 +1,11 @@
+node_modules/
+
+# Local Claude Code permission grants — machine-specific, and may contain
+# credentials pasted into allow-rules. Never distribute.
+.claude/settings.local.json
+
+# Per-person credentials + saved login session (see securiti-playwright-auth/README.md)
+securiti-playwright-auth/.env
+securiti-playwright-auth/.auth/
+
+.DS_Store

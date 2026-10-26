@@ -1,0 +1,20 @@
+{
+  "name": "locator-inspector",
+  "displayName": "Locator Inspector",
+  "description": "Drives the Locator Inspector bookmarklet (verified Playwright locators + flow recording for Securiti's app) directly through browser automation, and folds recorded tests into a real repo via the adopt-recorded-test skill.",
+  "version": "1.0.2",
+  "author": {
+    "name": "Mo Siddiqui"
+  },
+  "keywords": [
+    "playwright",
+    "qa",
+    "locators",
+    "test-automation",
+    "securiti"
+  ],
+  "skills": [
+    "./skills",
+    "./adoption-kit/.claude/skills"
+  ]
+}

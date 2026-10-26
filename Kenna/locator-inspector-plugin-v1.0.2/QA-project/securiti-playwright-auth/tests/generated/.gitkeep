@@ -1,0 +1,6 @@
+# The generator writes recorded specs into this directory.
+#
+# Nothing else in this package touches it. Files here are picked up by the
+# `chromium` project, which depends on `auth`, so they start authenticated.
+#
+# Naming: lowercase, [a-z0-9-], must end in `.spec.ts`, must not start with `auth`.

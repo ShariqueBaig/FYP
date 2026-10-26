@@ -1,0 +1,14 @@
+{
+  "name": "qa-tools",
+  "description": "QA tooling for Securiti app testing.",
+  "owner": {
+    "name": "Mo Siddiqui"
+  },
+  "plugins": [
+    {
+      "name": "locator-inspector",
+      "source": "./",
+      "description": "Verified Playwright locators + flow recording for Securiti's app, driven live through browser automation."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "locator-inspector-overlay",
+  "version": "1.0.0",
+  "description": "A live, on-page overlay that grades every button/link/input's test-locator stability **while you're actually using the app** \u2014 and auto-catches every toast, error banner, and validation message the instant it appears, even if it vanishes in under a second. No browser extension, no IT approval, no admin install: it's a bookmarklet, so it works instantly even in locked-down managed browsers (e.g. **Island**, which blocks most extensions by policy).",
+  "main": "build-bookmarklet.js",
+  "scripts": {
+    "test": "node tests/unique-locator.test.js && node tests/v4-agent.test.js && node tests/contextual.test.js && node tests/securiti-datahub.test.js && node tests/catalog.test.js && node tests/spec-compliance.test.js && node tests/doctor.test.js && node tests/build-output.test.js",
+    "build": "node build-bookmarklet.js && python3 -c \"open('../dist/install.html','w').write(open('install.template.html').read().replace('BOOKMARKLET_URI_PLACEHOLDER', open('../dist/bookmarklet.txt').read()))\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.0"
+  }
+}

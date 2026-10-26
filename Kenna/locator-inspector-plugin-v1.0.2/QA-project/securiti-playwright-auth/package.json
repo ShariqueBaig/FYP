@@ -1,0 +1,27 @@
+{
+  "name": "securiti-playwright-auth",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Playwright auth harness for the Securiti app. Logs in once, saves storageState, and injects it into every spec so recorded scripts run unchanged.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "browsers": "playwright install chromium",
+    "browsers:all": "playwright install chromium webkit firefox",
+    "login": "playwright test --project=auth",
+    "login:force": "npm run auth:clear && npm run login",
+    "auth:clear": "node -e \"require('fs').rmSync('.auth',{recursive:true,force:true})\"",
+    "test": "playwright test --project=chromium",
+    "test:ui": "playwright test --ui",
+    "test:example": "playwright test --project=examples",
+    "check:specs": "node scripts/check-generated-specs.js",
+    "typecheck": "tsc --noEmit",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.0",
+    "@types/node": "^22.8.2",
+    "typescript": "^5.8.3"
+  }
+}

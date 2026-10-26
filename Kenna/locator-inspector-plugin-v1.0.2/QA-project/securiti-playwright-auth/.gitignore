@@ -1,0 +1,18 @@
+node_modules/
+
+# Credentials. Never commit.
+.env
+.env.*
+!.env.example
+
+# A live session. Same sensitivity as the password that produced it.
+.auth/
+
+# Traces and screenshots can contain the login form and Set-Cookie headers.
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+*.log
+.DS_Store
