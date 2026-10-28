@@ -42,3 +42,28 @@ how it went. This file is the part of that contract Momo must follow.
 `userMessage` is meant to be read aloud. If Momo has a voice channel, speak it
 verbatim; the bracketed route trail at the end is for logs and may be dropped when
 speaking.
+
+## Plain language, and what to do when the site pushes back
+
+* **`say` for spoken or typed requests.** Pass the user's words to `fyp.mjs say`.
+  If the result is `need-more`, ask the user its `question` and try again with
+  their answer; if `not-understood`, read `userMessage` and stop. Never invent a
+  caption the user did not give.
+* **Read `spoken` aloud** when there is a voice channel. It is first person and
+  already says whether a fallback was needed.
+* **`blocked-by-protection` and `rate-limited` are not retried.** The site's own
+  protection stopped the assistant. Tell the user (`userMessage`), do not try to
+  get past it, and do not loop. The fix is the site owner allowing the assistant.
+* **Credentials.** If a login is needed and none is stored, say so; the user runs
+  `fyp.mjs vault set` themselves. Never ask for a password in the conversation.
+
+## Taught routines
+
+* If the user asks for something not built in, check `fyp.mjs routines`. If a
+  routine matches, use `say` (or `routine <name>`). If none does, say so and offer
+  to have the user teach one: **the human runs `fyp.mjs teach` themselves**; do not
+  try to record a demonstration on their behalf.
+* A taught routine fails like any other step: read `userMessage`, do not loop.
+* Routines replay at the window size they were taught at; a different size makes
+  the position-based fallback less reliable.
+

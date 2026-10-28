@@ -499,10 +499,16 @@
   };
 
   /** Route 1 - an accessible label. Survives re-layout, dies if under-labelled. */
-  const route_label = (intent, cs) => preferExact(intent, cs.filter((c) => c.label && kw(c.label, intent.labels)), 'label');
+  const route_label = (intent, cs) => {
+    const h = preferExact(intent, cs.filter((c) => c.label && kw(c.label, intent.labels)), 'label');
+    return intent.pick ? intent.pick(h, 'label') : h;   // taught list item: "the first of the matches"
+  };
 
   /** Route 2 - visible text. Breaks on copy or locale change. */
-  const route_text = (intent, cs) => preferExact(intent, cs.filter((c) => c.text && kw(c.text, intent.labels)), 'text');
+  const route_text = (intent, cs) => {
+    const h = preferExact(intent, cs.filter((c) => c.text && kw(c.text, intent.labels)), 'text');
+    return intent.pick ? intent.pick(h, 'text') : h;
+  };
 
   /**
    * Route 3 - the scoped chain.
@@ -555,7 +561,32 @@
   };
 
   /** Route 4 - geometry. No semantics at all: region plus ordinal. */
+  /** Where a control sits in its scrolling content, so "scrolled down a bit" does not move it. */
+  function docPos(el) {
+    let p = el.parentElement, sc = null;
+    while (p && p !== document.body) {
+      const o = getComputedStyle(p).overflowY;
+      if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight + 2) { sc = p; break; }
+      p = p.parentElement;
+    }
+    const r = el.getBoundingClientRect();
+    return { y: sc ? r.top + r.height / 2 - sc.getBoundingClientRect().top + sc.scrollTop : r.top + r.height / 2 + window.scrollY };
+  }
+
   const route_vision = (intent, cs) => {
+    // A step the user TAUGHT has no named region: it carries where the control sat
+    // (across the app column, down its scrolling content, size, kind) when it was
+    // demonstrated. Pure geometry again - nearest control of the same kind and similar
+    // size, and only if it is close enough to be a plausible match.
+    if (intent.geo) {
+      const g = intent.geo, W = Math.min(innerWidth, 500);
+      const tx = (innerWidth - W) / 2 + g.x * W;
+      const near = cs
+        .filter((c) => c.tag === g.tag && c.box.w > g.w * 0.6 && c.box.w < g.w * 1.6 && c.box.h > g.h * 0.6 && c.box.h < g.h * 1.6)
+        .map((c) => ({ c, d: Math.hypot(c.box.cx - tx, g.docY == null ? c.box.cy - g.y * innerHeight : docPos(c.el).y - g.docY) }))
+        .sort((a, b) => a.d - b.d);
+      return near.length && near[0].d <= (g.docY == null ? innerHeight * 0.15 : 90) ? [near[0].c] : [];
+    }
     /** Build the candidate pool, optionally ignoring the positional prior. */
     const build = (src, useRegion) => {
       let pool;
@@ -666,6 +697,62 @@
       tried.push({ route: route.name, count: hits.length });
     }
     return { ok: false, tried, ambiguous: tried.some((t) => t.count > 1) };
+  }
+
+  // ===========================================================================
+  // 4b. Route memory - learn which route worked and which one did not
+  // ===========================================================================
+  // Opt-in (memory.enabled), so the plain healed arm and its published numbers are
+  // unchanged. What is remembered, per intent:
+  //   route  the route that last achieved the goal: tried FIRST next time
+  //   avoid  routes that resolved uniquely, were acted on and had no effect (a
+  //          wrong-element hit): skipped while the screen looks the same
+  //   sig    structural signature of the screen (hooks and labels, no positions or
+  //          text): when it changes the UI has DRIFTED, so `avoid` is forgotten
+  //          and the run count to settle starts
+  // Memory only reorders and prunes. Every route still has to resolve to exactly
+  // one control and the success predicate still decides, so it cannot turn a
+  // failure into a success.
+  const memory = { enabled: false, intents: {} };
+
+  function sigOf(cs) {
+    return hash(cs.map((c) => (c.hook || '') + '|' + (c.label || '')).sort().join('\n'));
+  }
+
+  function memoryPlan(intent, sig) {
+    const order = ROUTES.map((_, i) => i);
+    const rec = memory.enabled ? memory.intents[intent.id] : null;
+    if (!rec) return { order, avoid: new Set(), drift: false, preferred: null };
+    const drift = !!rec.sig && rec.sig !== sig;
+    let preferred = null;
+    if (rec.route > 0) { order.splice(order.indexOf(rec.route), 1); order.unshift(rec.route); preferred = ROUTES[rec.route].name; }
+    return { order, avoid: new Set(drift ? [] : rec.avoid), drift, preferred };
+  }
+
+  function memoryRecord(intent, sig, plan, routeIndex, wasted, failedNow) {
+    if (!memory.enabled) return;
+    const rec = memory.intents[intent.id] || (memory.intents[intent.id] = { runs: 0, route: 0, sig, avoid: [], drifts: 0, sinceDrift: null, settledAfter: null });
+    rec.runs++;
+    if (plan.drift) { rec.drifts++; rec.sinceDrift = 0; rec.settledAfter = null; rec.avoid = []; }
+    rec.sig = sig;
+    rec.route = routeIndex;
+    rec.avoid = [...new Set([...rec.avoid, ...failedNow])].filter((x) => x !== routeIndex);
+    if (rec.sinceDrift !== null) {
+      rec.sinceDrift++;
+      if (rec.settledAfter === null && wasted === 0) rec.settledAfter = rec.sinceDrift;   // first run with no wasted action
+    }
+  }
+
+  /** Acted-on attempts that did not achieve the goal. Resolution misses (a route
+   *  matching 0 or 2+ controls) cost nothing, so they are not counted. */
+  const wastedOf = (attempts) => attempts.filter((a) => /\((no effect|obscured|threw|offscreen)\)/.test(a)).length;
+
+  function memoryNote(plan, skipped) {
+    const bits = [];
+    if (plan.drift) bits.push('drift');
+    if (plan.preferred) bits.push('first:' + plan.preferred);
+    if (skipped.length) bits.push('skipped:' + skipped.join('/'));
+    return bits.join(' ');
   }
 
   // ===========================================================================
@@ -906,8 +993,16 @@
     let csNow = cs;
     let fpNow = fp;
 
-    for (let i = 0; i < ROUTES.length; i++) {
+    const sig = sigOf(cs);
+    const plan = memoryPlan(intent, sig);
+    const failedNow = new Set();   // routes acted on this time that had no effect
+    const skipped = [];            // routes not tried because memory says they were wrong here
+    const learn = (routeIndex) => memoryRecord(intent, sig, plan, routeIndex, wastedOf(attempts), failedNow);
+    const memFields = () => ({ failedActions: wastedOf(attempts), memory: memory.enabled ? memoryNote(plan, skipped) : '' });
+
+    for (const i of plan.order) {
       const route = ROUTES[i];
+      if (plan.avoid.has(i)) { skipped.push(route.name); continue; }
       let hits = [];
       try {
         hits = route.run(intent, csNow) || [];
@@ -949,6 +1044,14 @@
         // Hand the acted-on element to the predicate, so success is judged on what
         // was actually touched rather than on a re-lookup that may find a decoy.
         intent._acted = c.el;
+        // A taught toggle can already be in the state the demonstration ended in
+        // (the post is already liked). Clicking again would undo it.
+        if (typeof intent.satisfiedBy === 'function' && intent.satisfiedBy(c.el)) {
+          return logRow({
+            intent: intent.id, routeIndex: -1, route: 'precondition', grade: '-', outcome: 'success',
+            detail: 'already in the wanted state - no action needed', ms: Math.round(now() - t0), tree: fpNow, order: opts.order,
+          });
+        }
         // Only from a healthy app: a break can move or hide the very control whose
         // neighbourhood is being measured.
         if (i === 0 && !multi && !Object.keys(state.chaos.active).length) learnPool(intent, csNow);
@@ -974,6 +1077,7 @@
             await sleep(450);
             await settle(8, 120);
             if (await waitFor(() => intent.success(intent), 900)) {
+              learn(i);
               return logRow({
                 intent: intent.id,
                 routeIndex: i,
@@ -984,6 +1088,7 @@
                 ms: Math.round(now() - t0),
                 tree: fpNow,
                 order: opts.order,
+                ...memFields(),
               });
             }
             attempts.push(tag + '+keyboard(no effect)');
@@ -996,6 +1101,7 @@
         const ok = await waitFor(() => intent.success(intent), i === 0 && !multi ? 1600 : 900);
 
         if (ok) {
+          learn(i);
           return logRow({
             intent: intent.id,
             routeIndex: i,
@@ -1009,6 +1115,7 @@
             ms: Math.round(now() - t0),
             tree: fpNow,
             order: opts.order,
+            ...memFields(),
           });
         }
 
@@ -1016,6 +1123,7 @@
         // goal is not met: a wrong-element hit or an obscured tap. Record it and
         // move on rather than retrying the same control blindly.
         attempts.push(tag + '(no effect)');
+        failedNow.add(i);
         csNow = await settle(6, 120);
         fpNow = fingerprint(csNow);
       }
@@ -1031,6 +1139,7 @@
       ms: Math.round(now() - t0),
       tree: fp,
       order: opts.order,
+      ...memFields(),
     });
   }
 
@@ -1247,10 +1356,11 @@
     for (let i = 0; i < INTENTS.length; i++) {
       if (stopped()) { halted = true; break; }
       const row = await runIntent(INTENTS[i], { order: i + 1 });
-      if (row.outcome === 'success') ok++;
+      if (row.outcome === 'success') { ok++; announce('Step ' + (i + 1) + ' of ' + INTENTS.length + ' done: ' + INTENTS[i].desc + '.'); }
       else if (row.outcome !== 'failed-predicate') {
         // A hard stop means the flow cannot continue; say why, in words.
         state.lastFatal = honestFailure(INTENTS[i], row);
+        announce(state.lastFatal);
         state.lastShot = null;
         render();
         state.lastShot = await captureShot();
@@ -1259,6 +1369,7 @@
       }
     }
     state.runs.healed = { ok, total: INTENTS.length, stopped: halted };
+    if (ok === INTENTS.length) announce('Finished. All ' + INTENTS.length + ' steps are done and the post is in the feed.');
     running = false;
     render();
   }
@@ -1325,26 +1436,50 @@
   }
 
   /** Put the app back on the feed, restoring hooks first so reset can work. */
-  /** If the login screen is up, sign in with the account from liveConfig.ts
-   *  (the app exposes it as window.FYP_LOGIN). No-op when already signed in. */
-  async function ensureLoggedIn() {
+  /** Credentials handed in by the agent runner (from its vault). Held only in this
+   *  closure: never on window, never in the DOM after login, never in a log row. */
+  let sessionCred = null;
+  let loginWhy = '';
+
+  /** If the login screen is up, sign in. Credentials come from the runner's vault
+   *  (agent.login) or, for a hand-run build, window.FYP_LOGIN. Success is the
+   *  next screen (the tab bar), never "the click did not throw". No-op when
+   *  already signed in. Sets loginWhy to a user-facing reason on failure. */
+  async function ensureLoggedIn(supplied) {
+    if (supplied && supplied.email && supplied.password) sessionCred = { email: supplied.email, password: supplied.password };
+    loginWhy = '';
     const user = document.querySelector('input[placeholder^="Phone number"]');
     const pass = document.querySelector('input[placeholder="Password"]');
     if (!user || !pass) return true;
-    const cred = window.FYP_LOGIN;
-    if (!cred || !cred.email || !cred.password) { flash('Login screen, but liveConfig.ts has no credentials.'); return false; }
+    const cred = sessionCred || window.FYP_LOGIN;
+    if (!cred || !cred.email || !cred.password) {
+      loginWhy = 'The app is asking for a login and I have no credentials. Store them with "fyp.mjs vault set" and run again with --login.';
+      flash('Login screen: no credentials supplied.'); return false;
+    }
+    const wipe = () => { try { typeInto(user, ''); typeInto(pass, ''); } catch (e) { /* page may have moved on */ } };
     typeInto(user, cred.email);
     typeInto(pass, cred.password);
     await sleep(250);
     const btn = [...document.querySelectorAll('[tabindex],button,[role=button]')].find((e) => /^log in$/i.test((e.textContent || '').trim()));
-    if (!btn) { flash('Could not find the Log in button.'); return false; }
+    if (!btn) { wipe(); loginWhy = 'I could not find the Log in button, so I did not sign in. You may need to log in yourself.'; flash('Could not find the Log in button.'); return false; }
     btn.click();
     for (let i = 0; i < 60; i++) {           // up to ~15s for Firebase to answer
       await sleep(250);
       if (document.querySelector('[data-testid="tab-home"]')) { await settle(8, 120); return true; }
     }
-    flash('Login did not complete - check liveConfig.ts and the Firebase console.');
+    wipe();                                  // a failed attempt must not leave the account on screen
+    loginWhy = 'I tried to sign in but the app stayed on the login screen. The stored login may be wrong or the account disabled. Check it, then re-run "fyp.mjs vault set".';
+    flash('Login did not complete.');
     return false;
+  }
+
+  /** Agent entry: sign in with credentials supplied by the runner. Never echoes them. */
+  async function agentLogin(cred) {
+    const onLogin = !!document.querySelector('input[placeholder="Password"]');
+    const ok = await ensureLoggedIn(cred);
+    return ok
+      ? { ok: true, alreadySignedIn: !onLogin, screen: detectScreen() }
+      : { ok: false, needsUser: true, error: 'login-failed', userMessage: loginWhy };
   }
 
   async function resetApp() {
@@ -1729,7 +1864,7 @@
   // ===========================================================================
   // 9c. Results: summary table, CSV export, and the N-times experiment
   // ===========================================================================
-  const CSV_COLS = ['timestamp', 'arm', 'config', 'rep', 'run', 'order', 'intent_id', 'route_index', 'route_name', 'grade', 'outcome', 'diagnosis', 'outcome_detail', 'ms_elapsed', 'tree_hash'];
+  const CSV_COLS = ['timestamp', 'arm', 'config', 'rep', 'run', 'order', 'intent_id', 'route_index', 'route_name', 'grade', 'outcome', 'diagnosis', 'outcome_detail', 'ms_elapsed', 'tree_hash', 'failed_actions', 'memory'];
 
   /** The suppression class a failure points at (plan section 6.3). */
   function diagnosis(r) {
@@ -1754,6 +1889,7 @@
       lines.push([
         r.timestamp, r.arm || 'healed', r.config, r.rep == null ? '' : r.rep, r.run, r.order,
         r.intent, r.routeIndex, r.route, r.grade, r.outcome, diagnosis(r), r.detail, r.ms, r.tree,
+        r.failedActions == null ? '' : r.failedActions, r.memory || '',
       ].map(csvCell).join(','));
     }
     return lines.join('\n');
@@ -1888,6 +2024,23 @@
     const s = Math.floor(ms / 1000);
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   };
+
+  /** Say it to a screen reader: a visually hidden polite live region. An assistant
+   *  for people who may not see the screen has to narrate, not only paint. */
+  function announce(msg) {
+    if (!document.body) return;
+    let r = document.getElementById('__fyp-live');
+    if (!r) {
+      r = document.createElement('div');
+      r.id = '__fyp-live';
+      r.setAttribute('role', 'status');
+      r.setAttribute('aria-live', 'polite');
+      r.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;';
+      document.body.appendChild(r);
+    }
+    r.textContent = '';
+    setTimeout(() => { r.textContent = String(msg); }, 30);   // a change, not a repeat, so it is read out
+  }
 
   function flash(msg, kind) {
     const t = document.createElement('div');
@@ -2575,10 +2728,415 @@
   // assistant has to relay it to a person. The contract is documented in
   // AGENTS.md and agent/tool-manifest.json - keep the three in step.
   // ===========================================================================
+  // ===========================================================================
+  // 11. Teaching - learn a new routine from ONE demonstration
+  // ===========================================================================
+  // The user does a task once by hand. For every action the recorder keeps
+  //   * WHAT was touched, as the same kind of description the ladder already runs
+  //     on (hook, label, text, position among look-alikes, where it sat), and
+  //   * WHAT CHANGED afterwards, learned from a before/after diff: text that
+  //     appeared, text that went, the control's own look, the typed value.
+  // That second part is the step's success check. A step whose effect cannot be
+  // seen is REFUSED, not saved: a step that cannot be verified cannot be healed,
+  // and a replay that cannot tell whether it worked is the failure this FYP is
+  // about. Replay runs every step through the normal ladder (route memory, the
+  // keyboard route, honest failure, the breaks) - a taught step is not special.
+  //
+  // Never recorded: the value typed into a password field.
+  const normText = (s) => strip(String(s == null ? '' : s)).replace(/\d[\d,.]*/g, '#').toLowerCase();
+  const stemOf = (h) => h.replace(/[-_:][^-_:]*\d[^-_:]*$/, '');
+  const pickIn = (list, ordinal, size) => {
+    if (!list.length) return null;
+    if (ordinal === 0) return list[0];
+    if (size > 1 && ordinal === size - 1) return list[list.length - 1];   // "the last one"
+    return list[ordinal] || null;
+  };
+
+  /** Visible text lines (digits folded to #) plus aria-labels, minus the harness's own UI. */
+  function pageTexts() {
+    const set = new Set();
+    for (const top of document.body.children) {
+      if ((top.id && top.id.indexOf('__fyp') === 0) || (top.hasAttribute && top.hasAttribute('data-fyp-toast'))) continue;
+      for (const line of String(top.innerText || '').split('\n')) {
+        const t = normText(line);
+        if (t.length >= 2 && t.length <= 60) set.add(t);
+      }
+    }
+    for (const el of document.querySelectorAll('[aria-label]')) {
+      if (el.closest('#' + PANEL_ID)) continue;
+      const t = normText(el.getAttribute('aria-label'));
+      if (t) set.add('@' + t);
+    }
+    return set;
+  }
+
+  /** How a control LOOKS, so "the heart turned red" is observable without any hook. */
+  function styleSig(el) {
+    if (!el || !el.isConnected) return '';
+    const nodes = [el, ...el.querySelectorAll('*')].slice(0, 24);
+    return hash(nodes.map((n) => {
+      const cs = getComputedStyle(n);
+      const own = n.children.length ? '' : String(n.textContent || '').slice(0, 6);
+      return [cs.color, cs.backgroundColor, cs.fill, cs.stroke, cs.opacity, n.getAttribute('aria-pressed') || '', n.getAttribute('aria-checked') || '', own].join('|');
+    }).join(';'));
+  }
+
+  function groupOf(c, cs) {
+    const s = c.hook ? stemOf(c.hook) : '';
+    const byHook = s && s !== c.hook ? cs.filter((o) => o.hook && stemOf(o.hook) === s) : [];
+    if (byHook.length > 1) return { by: 'hook', key: s, members: byHook };
+    const byLabel = c.label ? cs.filter((o) => o.label === c.label) : [];
+    if (byLabel.length > 1) return { by: 'label', key: c.label, members: byLabel };
+    const byText = c.text && c.text.length <= 30 ? cs.filter((o) => o.text === c.text) : [];
+    if (byText.length > 1) return { by: 'text', key: c.text, members: byText };
+    return null;
+  }
+
+  /** Everything the ladder needs to find this control again. */
+  function describeControl(c, cs) {
+    const W = Math.min(innerWidth, 500);
+    const d = {
+      hook: c.hook || '', label: c.label || '', text: (c.text || '').slice(0, 60), tag: c.tag, role: c.role || '',
+      placeholder: c.el.getAttribute('placeholder') || '',
+      region: Object.keys(REGIONS).find((n) => inRegion(c, n)) || null,
+      geo: { x: +((c.box.cx - (innerWidth - W) / 2) / W).toFixed(3), y: +(c.box.cy / innerHeight).toFixed(3), docY: Math.round(docPos(c.el).y), w: Math.round(c.box.w), h: Math.round(c.box.h) },
+      path: c.path,
+    };
+    const g = groupOf(c, cs);
+    if (g) d.group = { by: g.by, key: g.key, size: g.members.length, ordinal: g.members.indexOf(c) };
+    const lab = c.label ? cs.filter((o) => o.label === c.label) : [];
+    if (lab.length > 1) d.labelGroup = { by: 'label', key: c.label, size: lab.length, ordinal: lab.indexOf(c) };
+    return d;
+  }
+
+  const ordinalWord = (g) => (g.ordinal === 0 ? 'the first' : g.ordinal === g.size - 1 ? 'the last' : 'number ' + (g.ordinal + 1)) + ' of ' + g.size;
+  function stepDesc(action, d) {
+    const name = d.label || d.text || d.placeholder || d.hook || 'a control';
+    return (action === 'type' ? 'Type into "' : 'Tap "') + name + '"' + (d.group ? ' (' + ordinalWord(d.group) + ')' : '');
+  }
+  function checkText(ev) {
+    if (ev.typed) return 'the typed text is in the field';
+    const bits = [];
+    if (ev.style) bits.push('the control changes look');
+    if (ev.ctl && ev.ctl.length) bits.push('new controls appear (' + ev.ctl.slice(0, 3).map((k) => '"' + k.replace(/^[a-z]:/, '') + '"').join(', ') + ')');
+    if (ev.appeared.length) bits.push('shows ' + ev.appeared.slice(0, 2).map((t) => '"' + t.replace(/^@/, '') + '"').join(' and '));
+    if (ev.gone.length) bits.push('no longer shows ' + ev.gone.slice(0, 2).map((t) => '"' + t.replace(/^@/, '') + '"').join(' and '));
+    return bits.join('; ');
+  }
+
+  const teach = { on: false, name: '', steps: [], params: {}, typed: [], queue: Promise.resolve(), typing: null, pending: null, warnings: [], listeners: null, startScreen: 1 };
+
+  /** What controls exist, by the most stable name each has (label, placeholder, hook stem, short text).
+   *  "A comment box and a Post button appeared" survives a different post being first; a text line
+   *  like "no comments yet" does not. */
+  function ctlKeys(cs) {
+    const set = new Set();
+    for (const c of cs) {
+      const ph = c.el.getAttribute('placeholder');
+      if (c.label) set.add('l:' + normText(c.label));
+      else if (ph) set.add('p:' + normText(ph));
+      else if (c.hook) set.add('h:' + stemOf(c.hook));
+      else if (c.text && c.text.length <= 30) set.add('t:' + normText(c.text));
+    }
+    return set;
+  }
+
+  function preSnap(target) {
+    const cs = collect();
+    const ctl = target && target.closest ? target.closest(CONTROL_SEL) : null;
+    const c = ctl ? cs.find((x) => x.el === ctl) : null;
+    if (!c) return null;
+    return { cs, c, texts: pageTexts(), ctl: ctlKeys(cs), style: styleSig(c.el), desc: describeControl(c, cs), screen: detectScreen() };
+  }
+
+  function recIndicator() {
+    let r = document.getElementById('__fyp-rec');
+    if (!teach.on) { if (r) r.remove(); return; }
+    if (!r) {
+      r = document.createElement('div');
+      r.id = '__fyp-rec';
+      r.style.cssText = 'position:fixed;top:8px;left:8px;z-index:100002;background:#b00020;color:#fff;border-radius:999px;padding:4px 12px;font:600 12px system-ui,sans-serif;pointer-events:none;';
+      document.body.appendChild(r);
+    }
+    r.textContent = '● Recording "' + teach.name + '" - ' + teach.steps.length + ' step(s)';
+  }
+
+  function paramName(d) {
+    const base = String(d.hook || d.label || d.placeholder || 'text').split(/[-\s]/)[0].toLowerCase().replace(/[^a-z0-9]/g, '') || 'text';
+    let n = base, i = 2;
+    while (teach.params[n]) n = base + i++;
+    return n;
+  }
+
+  /** Close the typing step (sync, so it sees the field before the next click can change anything). */
+  function flushTyping() {
+    const t = teach.typing;
+    teach.typing = null;
+    if (!t) return;
+    const el = t.el;
+    if (el.type === 'password') {
+      teach.warnings.push('A password field was used. I never record what is typed into one, so that step is not part of the routine: log in first, then teach.');
+      return;
+    }
+    const value = String(el.value || '');
+    if (!value) return;
+    const name = paramName(t.pre.desc);
+    teach.params[name] = { default: value };
+    teach.typed.push({ name, norm: normText(value) });
+    const ev = { typed: true, appeared: [], gone: [], style: null };
+    teach.steps.push({ action: 'type', target: t.pre.desc, desc: stepDesc('type', t.pre.desc) + ' (parameter ' + name + ')', value: { param: name, default: value }, evidence: ev, check: checkText(ev) });
+    recIndicator();
+    announce('Recorded step ' + teach.steps.length + ': ' + teach.steps[teach.steps.length - 1].desc);
+  }
+
+  /** Work out what a click changed, from the DOM as it is RIGHT NOW. Runs once per step: either
+   *  after the screen has settled, or earlier if the user's next action begins first - a step's
+   *  effect must never be credited with what the following step did. */
+  function computeEvidence(pre, step) {
+    if (step.final) return;
+    step.final = true;
+    const after = pageTexts();
+    const afterCtl = ctlKeys(collect());
+    let el = pre.c.el;
+    if (!el.isConnected) {                              // the app re-rendered the control
+      const cs = collect();
+      el = (pre.desc.hook && cs.find((x) => x.hook === pre.desc.hook) ||
+            (pre.desc.group && pickIn(cs.filter((x) => (pre.desc.group.by === 'hook' ? x.hook && stemOf(x.hook) === pre.desc.group.key : x.label === pre.desc.group.key)), pre.desc.group.ordinal, pre.desc.group.size)) ||
+            null);
+      el = el && el.el ? el.el : null;
+    }
+    const styleAfter = el ? styleSig(el) : '';
+    let appeared = [...after].filter((t) => !pre.texts.has(t));
+    // Text that echoes what was typed earlier becomes a template, so a different value still verifies.
+    appeared = appeared.map((t) => { for (const v of teach.typed) if (v.norm && t.includes(v.norm)) return t.replace(v.norm, '{{' + v.name + '}}'); return t; });
+    // Keep only lines that can recur: no folded numbers (counts, times, who liked what) unless they carry the typed value.
+    appeared = appeared.filter((t) => t.includes('{{') || (!t.includes('#') && !t.startsWith('@')));
+    const rank = (a) => a.slice().sort((x, y) => y.length - x.length).slice(0, 8);
+    const ctl = [...afterCtl].filter((k) => !pre.ctl.has(k));
+    const style = el && styleAfter && styleAfter !== pre.style ? { before: pre.style, after: styleAfter } : null;
+    // Text that went away is content-specific ("liked by <whoever is first>"): only worth keeping when
+    // nothing else shows the step worked (a dismissed dialog, say).
+    const gone = !ctl.length && !appeared.length && !style ? rank([...pre.texts].filter((t) => !after.has(t) && !t.includes('#') && !t.startsWith('@'))).slice(0, 4) : [];
+    step.evidence = { typed: false, appeared: rank(appeared), gone, ctl: ctl.slice(0, 8), style };
+    step.check = checkText(step.evidence);
+  }
+
+  /** The settled "after" half of a click (unless the next action already closed the step). */
+  async function finishClick(pre, step) {
+    await sleep(450);
+    await settle(8, 120);
+    computeEvidence(pre, step);
+  }
+
+  /** Close the previous click NOW, before the next action's handlers can change the screen. */
+  function closePending() {
+    const p = teach.pending;
+    teach.pending = null;
+    if (p) computeEvidence(p.pre, p.step);
+  }
+
+  function teachStart(name) {
+    if (teach.on) return { ok: false, userMessage: 'Already recording "' + teach.name + '". Stop it first.' };
+    Object.assign(teach, { on: true, name: String(name || 'routine'), steps: [], params: {}, typed: [], queue: Promise.resolve(), typing: null, pending: null, warnings: [], startScreen: detectScreen(), viewport: { w: innerWidth, h: innerHeight } });
+    const onClick = (e) => {
+      if (!teach.on || !e.isTrusted) return;                // only a real person; the harness's own taps are synthetic
+      if (e.target && e.target.closest && e.target.closest('#' + PANEL_ID)) return;
+      closePending();
+      flushTyping();
+      const pre = preSnap(e.target);
+      if (!pre) { teach.warnings.push('A tap on something that is not a control was ignored.'); return; }
+      const step = { action: 'click', target: pre.desc, desc: stepDesc('click', pre.desc), value: null, evidence: null, check: '' };
+      teach.steps.push(step);
+      teach.pending = { pre, step };
+      recIndicator();
+      teach.queue = teach.queue.then(() => finishClick(pre, step)).then(() => { const n = teach.steps.indexOf(step); if (n >= 0) announce('Recorded step ' + (n + 1) + ': ' + step.desc); });
+    };
+    const onInput = (e) => {
+      if (!teach.on || !e.isTrusted) return;
+      const el = e.target;
+      if (!el || !/^(INPUT|TEXTAREA)$/.test(el.tagName)) return;
+      if (!teach.typing || teach.typing.el !== el) {
+        // Clicking into a field and then typing is one action: the typing is the step, and it
+        // is what gets verified. The focus click on its own changes nothing anyone can check.
+        if (teach.pending && teach.pending.pre.c.el === el) {
+          teach.pending.step.final = true;
+          const at = teach.steps.indexOf(teach.pending.step);
+          if (at >= 0) teach.steps.splice(at, 1);
+          teach.pending = null;
+        }
+        closePending(); flushTyping();
+        const pre = preSnap(el);
+        if (pre) teach.typing = { el, pre };
+      }
+    };
+    const onBlur = (e) => { if (teach.on && teach.typing && teach.typing.el === e.target) flushTyping(); };
+    document.addEventListener('click', onClick, true);
+    document.addEventListener('input', onInput, true);
+    document.addEventListener('focusout', onBlur, true);
+    teach.listeners = { onClick, onInput, onBlur };
+    recIndicator();
+    announce('Recording started. Do the task once, then say stop.');
+    return { ok: true, name: teach.name, startScreen: SCREEN_NAME[teach.startScreen] || 'feed' };
+  }
+
+  async function teachStop() {
+    if (!teach.on) return { ok: false, error: 'not-recording', userMessage: 'I was not recording.' };
+    flushTyping();
+    await teach.queue;
+    document.removeEventListener('click', teach.listeners.onClick, true);
+    document.removeEventListener('input', teach.listeners.onInput, true);
+    document.removeEventListener('focusout', teach.listeners.onBlur, true);
+    teach.on = false;
+    recIndicator();
+    const steps = teach.steps;
+    if (!steps.length) return { ok: false, error: 'nothing-recorded', userMessage: 'I did not see any steps, so there is nothing to save.', warnings: teach.warnings };
+    const bad = steps.findIndex((s) => !s.evidence || (!s.evidence.typed && !s.evidence.appeared.length && !s.evidence.gone.length && !(s.evidence.ctl && s.evidence.ctl.length) && !s.evidence.style));
+    if (bad >= 0) {
+      return {
+        ok: false, error: 'unverifiable-step', warnings: teach.warnings,
+        userMessage: 'I could not see anything change after step ' + (bad + 1) + ' (' + steps[bad].desc + '), so I cannot check that it worked, and I will not save a step I cannot verify. Try showing me the result, for example a final tap that makes it visible, then teach again.',
+      };
+    }
+    const routine = {
+      version: 1, name: teach.name, createdAt: new Date().toISOString(), start: { screen: SCREEN_NAME[teach.startScreen] || 'feed' },
+      // Layout moves with window size; the position-based route is only as good as this match.
+      viewport: teach.viewport,
+      params: teach.params, phrases: [],
+      steps: steps.map((s, i) => ({ n: i + 1, ...s })),
+    };
+    return { ok: true, routine, warnings: teach.warnings, readback: routine.steps.map((s) => s.n + '. ' + s.desc + ' - done when ' + s.check) };
+  }
+
+  const paramValue = (spec, params) => (spec && typeof spec === 'object' ? (params && params[spec.param] != null ? params[spec.param] : spec.default) : spec);
+
+  /** A taught step, as the same object shape the ladder already runs on. */
+  function intentFromStep(step, idx, routine, params) {
+    const d = step.target, ev = step.evidence;
+    const expected = (list) => list.map((t) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => normText(paramValue({ param: k, default: (routine.params[k] || {}).default }, params))));
+    const it = {
+      id: routine.name + '.' + (idx + 1), learned: true, action: step.action, desc: step.desc, successDesc: step.check,
+      labels: [d.label, d.text, d.placeholder].filter((x) => x && x.length <= 40),
+      anchor: null, region: d.region, ordinal: 0,
+      geo: { tag: d.tag, ...d.geo },
+      testId: d.hook ? (cs) => {
+        if (d.group && d.group.by === 'hook') {
+          const m = pickIn(cs.filter((o) => o.hook && stemOf(o.hook) === d.group.key), d.group.ordinal, d.group.size);
+          return m ? m.hook : '__no_such_hook__';
+        }
+        return d.hook;
+      } : null,
+      pick: (hits, kind) => {
+        const g = (kind === 'label' ? d.labelGroup || d.group : d.group || d.labelGroup);
+        if (!g) return hits;
+        const m = pickIn(hits, g.ordinal, g.size);
+        return m ? [m] : [];
+      },
+      satisfiedBy: ev && ev.style ? (el) => styleSig(el) === ev.style.after && ev.style.after !== ev.style.before : null,
+      capture: () => { it._beforeTexts = pageTexts(); it._beforeCtl = ctlKeys(collect()); return 1; },
+      success: () => {
+        const el = it._acted;
+        if (ev.typed) return !!(el && el.isConnected && String(el.value) === String(it.value));
+        if (ev.style && el && el.isConnected && styleSig(el) === ev.style.after) return true;
+        if (ev.ctl && ev.ctl.length) {
+          const nowCtl = ctlKeys(collect()), beforeCtl = it._beforeCtl || new Set();
+          if (ev.ctl.filter((k) => nowCtl.has(k) && !beforeCtl.has(k)).length >= Math.ceil(ev.ctl.length * 0.6)) return true;
+        }
+        const now2 = pageTexts(), before = it._beforeTexts || new Set();
+        const a = expected(ev.appeared), g = expected(ev.gone);
+        if (a.length && a.filter((t) => now2.has(t) && !before.has(t)).length >= Math.ceil(a.length * 0.6)) return true;
+        if (g.length && g.filter((t) => !now2.has(t) && before.has(t)).length >= Math.ceil(g.length * 0.6)) return true;
+        return false;
+      },
+    };
+    if (step.action === 'type') it.value = String(paramValue(step.value, params));
+    return it;
+  }
+
+  /** The recorded-locator way to replay a taught step, for the comparison arm. */
+  function baselineFind(d) {
+    const q = (s) => [...document.querySelectorAll(s)];
+    if (d.group && d.group.by === 'hook') return q('[data-testid^="' + d.group.key + '"]')[d.group.ordinal] || null;
+    if (d.hook) return document.querySelector('[data-testid="' + d.hook + '"]');
+    if (d.label) return q('[aria-label="' + d.label + '"]')[(d.labelGroup || { ordinal: 0 }).ordinal] || null;
+    if (d.placeholder) return q('[placeholder="' + d.placeholder + '"]')[0] || null;
+    // A recorder keys a text-only control on its visible text (Playwright's getByText), and
+    // only falls back to a raw path when there is nothing else. Without this the baseline
+    // would be handed the most fragile locator available - a strawman.
+    if (d.text) {
+      const m = q(CONTROL_SEL).filter((e) => textOf(e) === d.text);
+      return m[d.group && d.group.by === 'text' ? d.group.ordinal : 0] || null;
+    }
+    return document.querySelector(d.path);
+  }
+
+  async function agentRoutine(opts) {
+    opts = opts || {};
+    const routine = opts.routine;
+    if (!routine || !Array.isArray(routine.steps)) return { ok: false, error: 'bad-routine', userMessage: 'That routine is missing or damaged.' };
+    if (agentBusy()) return { ok: false, error: 'busy', userMessage: 'The assistant is already running a task.' };
+    const arm = opts.arm === 'baseline' ? 'baseline' : 'healed';
+    const breaks = (opts.breaks || []).filter((k) => BREAKS[k]);
+    const params = opts.params || {};
+    memory.enabled = !!opts.memory && arm === 'healed';
+    running = true;
+    state.runId++;
+    const rows = [];
+    let ok = 0, verified = 0, fatal = null;
+    try {
+      await resetApp();                                  // taught routines start from the feed
+      breaks.forEach((k) => applyBreak(k));
+      for (let i = 0; i < routine.steps.length; i++) {
+        const step = routine.steps[i];
+        const it = intentFromStep(step, i, routine, params);
+        if (arm === 'baseline') {
+          const t0 = now();
+          let outcome = 'success', detail = 'the stored locator resolved', effect = false;
+          try {
+            const el = baselineFind(step.target);
+            if (!el) throw new Error('locator no longer resolves');
+            if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'center' });
+            await sleep(300);
+            it.capture(); it._acted = el;
+            if (step.action === 'type') typeInto(el, it.value); else realClick(el);
+            await sleep(500);
+            try { effect = !!it.success(); } catch (e) { effect = false; }
+          } catch (e) {
+            outcome = 'failed-not-found';
+            detail = String((e && e.message) || e);
+          }
+          if (outcome === 'success') { ok++; if (effect) verified++; }
+          rows.push(logRow({ arm: 'baseline', intent: it.id, routeIndex: 0, route: 'hard-coded', grade: 'F', outcome, detail: detail + (outcome === 'success' ? (effect ? ' (effect seen)' : ' (but no visible effect)') : ''), ms: Math.round(now() - t0), order: i + 1 }));
+          continue;
+        }
+        const row = await runIntent(it, { order: i + 1 });
+        rows.push(row);
+        if (row.outcome === 'success') { ok++; verified++; announce('Step ' + (i + 1) + ' of ' + routine.steps.length + ' done: ' + step.desc + '.'); }
+        else { fatal = honestFailure(it, row); announce(fatal); break; }
+      }
+    } catch (e) {
+      fatal = 'The assistant hit an internal error: ' + (e && e.message);
+    } finally {
+      clearChaos();
+      memory.enabled = false;
+      running = false;
+      render();
+    }
+    const total = routine.steps.length;
+    const done = arm === 'baseline' ? verified === total : ok === total;
+    return {
+      ok: done, arm, routine: routine.name, breaks, params,
+      stepsOk: ok, stepsVerified: verified, stepsTotal: total,
+      needsUser: !done,
+      userMessage: done ? null : fatal || (arm === 'baseline' ? 'The recorded locators ran but not every step had its visible effect.' : 'The routine did not complete.'),
+      rows: rows.map(rowView),
+    };
+  }
+
   const AGENT_VERSION = 1;
   const rowView = (r) => ({
     order: r.order, intent: r.intent, arm: r.arm || 'healed', route: r.route, routeIndex: r.routeIndex,
     grade: r.grade, outcome: r.outcome, diagnosis: diagnosis(r), detail: r.detail, ms: r.ms,
+    failedActions: r.failedActions == null ? null : r.failedActions, memory: r.memory || '',
   });
   const intentById = (id) => INTENTS.find((i) => i.id === id);
   const agentBusy = () => running || state.exp.active;
@@ -2591,6 +3149,19 @@
       await sleep(200);
     }
     return false;
+  }
+
+  /** Harness is up and the app shows either its login form or its feed. Used by the
+   *  runner in live mode, where ready() cannot be true until after the login. */
+  async function agentAlive(timeoutMs) {
+    const t0 = now();
+    while (now() - t0 < (timeoutMs || 25000)) {
+      const h = window[NS];
+      const login = !!document.querySelector('input[placeholder="Password"]');
+      if (h && h.active && (login || document.querySelector('[data-testid="tab-home"]'))) return { loginScreen: login };
+      await sleep(200);
+    }
+    return null;
   }
 
   function agentStatus() {
@@ -2624,6 +3195,7 @@
       return { ok: false, error: 'unknown-break', userMessage: 'Unknown break id in: ' + (opts.breaks || []).join(', ') };
     }
     CAPTION_TEXT = opts.caption ? String(opts.caption) : DEFAULT_CAPTION + ' ' + Math.random().toString(36).slice(2, 6);
+    memory.enabled = !!opts.memory && arm === 'healed';   // the recorded-locator baseline never learns
     try {
       // Break first, THEN run: runHealed()/runBaseline() capture the armed set and
       // re-apply it after their own reset (see the trap noted in the plan).
@@ -2653,6 +3225,7 @@
       return { ok: false, needsUser: true, error: 'exception', userMessage: 'The assistant hit an internal error: ' + (e && e.message), rows: [] };
     } finally {
       clearChaos();
+      memory.enabled = false;   // learned state stays; learning is switched on per call
     }
   }
 
@@ -2690,6 +3263,25 @@
     experiment: agentExperiment,
     results: () => JSON.parse(resultsJson()),
     resetApp: async () => { await resetApp(); return agentStatus(); },
+    login: agentLogin,
+    alive: agentAlive,
+    // Teaching: record one demonstration, get a routine back, replay it through the ladder.
+    teach: {
+      start: teachStart,
+      stop: teachStop,
+      status: () => ({ recording: teach.on, name: teach.name, steps: teach.steps.length, warnings: teach.warnings.slice() }),
+    },
+    runRoutine: agentRoutine,
+    // Route memory (see 4b): export / import it so it survives a fresh page.
+    memory: {
+      get: () => JSON.parse(JSON.stringify(memory.intents)),
+      set: (obj) => { memory.intents = obj && typeof obj === 'object' ? JSON.parse(JSON.stringify(obj)) : {}; return Object.keys(memory.intents).length; },
+      clear: () => { memory.intents = {}; return 0; },
+      summary: () => Object.entries(memory.intents).map(([id, r]) => ({
+        intent: id, runs: r.runs, route: ROUTES[r.route] ? ROUTES[r.route].name : null, avoid: r.avoid.map((x) => ROUTES[x].name),
+        drifts: r.drifts, runsToSettle: r.settledAfter, settling: r.sinceDrift !== null && r.settledAfter === null,
+      })),
+    },
   };
 
   const boot = () => { if (document.body) panel(); else setTimeout(boot, 120); };

@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "name": "comment.first",
+  "createdAt": "2026-10-28T16:47:21.478Z",
+  "start": {
+    "screen": "feed"
+  },
+  "viewport": {
+    "w": 1600,
+    "h": 900
+  },
+  "params": {
+    "comment": {
+      "default": "great shot"
+    }
+  },
+  "phrases": [
+    "comment {comment} on the first post"
+  ],
+  "steps": [
+    {
+      "n": 1,
+      "action": "click",
+      "target": {
+        "hook": "",
+        "label": "",
+        "text": "Add a comment...",
+        "tag": "div",
+        "role": "",
+        "placeholder": "",
+        "region": "gallery-grid",
+        "geo": {
+          "x": 0.5,
+          "y": 0.502,
+          "docY": 962,
+          "w": 470,
+          "h": 24
+        },
+        "path": "div:nth-child(1)>div:nth-child(1)>div:nth-child(1)>div:nth-child(1)>div:nth-child(2)>div:nth-child(1)>div:nth-child(3)>div:nth-child(4)>div:nth-child(4)",
+        "group": {
+          "by": "text",
+          "key": "Add a comment...",
+          "size": 15,
+          "ordinal": 0
+        }
+      },
+      "desc": "Tap \"Add a comment...\" (the first of 15)",
+      "value": null,
+      "evidence": {
+        "typed": false,
+        "appeared": [
+          "start the conversation.",
+          "no comments yet",
+          "comments",
+          "post"
+        ],
+        "gone": [],
+        "ctl": [
+          "p:add a comment...",
+          "l:post comment"
+        ],
+        "style": null
+      },
+      "check": "new controls appear (\"add a comment...\", \"post comment\"); shows \"start the conversation.\" and \"no comments yet\"",
+      "final": true
+    },
+    {
+      "n": 2,
+      "action": "type",
+      "target": {
+        "hook": "comment-input",
+        "label": "",
+        "text": "",
+        "tag": "input",
+        "role": "",
+        "placeholder": "Add a comment...",
+        "region": "bottom-nav",
+        "geo": {
+          "x": 0.506,
+          "y": 0.967,
+          "docY": 870,
+          "w": 376,
+          "h": 40
+        },
+        "path": "div:nth-child(1)>div:nth-child(1)>div:nth-child(1)>div:nth-child(1)>div:nth-child(3)>input:nth-child(1)"
+      },
+      "desc": "Type into \"Add a comment...\" (parameter comment)",
+      "value": {
+        "param": "comment",
+        "default": "great shot"
+      },
+      "evidence": {
+        "typed": true,
+        "appeared": [],
+        "gone": [],
+        "style": null
+      },
+      "check": "the typed text is in the field"
+    },
+    {
+      "n": 3,
+      "action": "click",
+      "target": {
+        "hook": "comment-post",
+        "label": "Post comment",
+        "text": "Post",
+        "tag": "div",
+        "role": "",
+        "placeholder": "",
+        "region": "bottom-nav",
+        "geo": {
+          "x": 0.924,
+          "y": 0.967,
+          "docY": 870,
+          "w": 42,
+          "h": 19
+        },
+        "path": "div:nth-child(1)>div:nth-child(1)>div:nth-child(1)>div:nth-child(1)>div:nth-child(3)>div:nth-child(2)"
+      },
+      "desc": "Tap \"Post comment\"",
+      "value": null,
+      "evidence": {
+        "typed": false,
+        "appeared": [
+          "ahan_gar# {{comment}}",
+          "delete"
+        ],
+        "gone": [],
+        "ctl": [
+          "l:delete comment",
+          "l:like comment"
+        ],
+        "style": {
+          "before": "56e583fc",
+          "after": "c1349a32"
+        }
+      },
+      "check": "the control changes look; new controls appear (\"delete comment\", \"like comment\"); shows \"ahan_gar# {{comment}}\" and \"delete\"",
+      "final": true
+    }
+  ]
+}

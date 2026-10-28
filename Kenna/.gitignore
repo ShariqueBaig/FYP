@@ -8,3 +8,8 @@ insta clone/
 agent/node_modules/
 agent/results/
 *.shot.png
+site/
+
+# credential vault + local secrets: never commit
+agent/.vault/
+agent/.env.local

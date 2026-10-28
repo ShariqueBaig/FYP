@@ -12,9 +12,20 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { startServer } from './server.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+// Routines the user taught: one JSON file each. No secrets in them (a password
+// field is never recorded), so they are meant to be committed and shared.
+const ROUTINES = path.join(HERE, 'routines');
+const loadRoutines = () => {
+  if (!fs.existsSync(ROUTINES)) return [];
+  return fs.readdirSync(ROUTINES).filter((f) => f.endsWith('.json')).flatMap((f) => {
+    try { return [JSON.parse(fs.readFileSync(path.join(ROUTINES, f), 'utf8'))]; } catch { return []; }
+  });
+};
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -30,10 +41,37 @@ function parseArgs(argv) {
 }
 
 const log = (...a) => console.error('[fyp]', ...a);
-const emit = (obj, code) => { process.stdout.write(JSON.stringify(obj, null, 2) + '\n'); process.exit(code); };
+
+// Anything that came out of the vault is scrubbed from the one JSON document, so
+// a login can never leak through a message, a log row or an error string.
+const secrets = new Set();
+const scrub = (text) => {
+  let t = text;
+  for (const s of secrets) {
+    if (!s) continue;
+    for (const form of [s, JSON.stringify(s).slice(1, -1), encodeURIComponent(s)]) t = t.split(form).join('***');
+  }
+  return t;
+};
+// `decorate` lets `say` wrap the one result with what was heard and a sentence to
+// read aloud; `--speak` then says it out loud (Windows speech, no extra install).
+let decorate = null;
+const speak = (text) => {
+  if (!text || process.platform !== 'win32') return;
+  spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak($env:FYP_SAY)'],
+  { env: { ...process.env, FYP_SAY: text }, stdio: 'ignore' });
+};
+let speakIt = false;
+const emit = (obj, code) => {
+  if (decorate) obj = decorate(obj);
+  process.stdout.write(scrub(JSON.stringify(obj, null, 2)) + '\n');
+  if (speakIt && obj && obj.spoken) speak(scrub(obj.spoken));
+  process.exit(code);
+};
 
 const args = parseArgs(process.argv.slice(2));
-const cmd = args._[0];
+let cmd = args._[0];
 if (!cmd || args.help) {
   emit({ usage: [
     'fyp.mjs describe',
@@ -42,9 +80,62 @@ if (!cmd || args.help) {
     'fyp.mjs intent <intent.id> [--caption "text"]',
     'fyp.mjs survey',
     'fyp.mjs experiment [--n 3] [--set demo|full] [--out dir]',
+    'fyp.mjs say "post a photo with caption hello" [--speak]   plain English in; one JSON out (+ a sentence to read aloud)',
+    'fyp.mjs teach --name like.first --say "like the first post" --headed   do a task ONCE by hand; Enter to finish; it learns the steps + a check for each',
+    'fyp.mjs routines                   what has been taught',
+    'fyp.mjs routine <name> [--params \'{"comment":"hi"}\'] [--breaks B1] [--arm healed|baseline] [--memory]',
+    'fyp.mjs learn [--runs 8] [--drift-at 3] [--breaks B1,B6] [--out dir]   does remembering routes pay off after the UI changes?',
+    'fyp.mjs run ... --memory           healed arm that remembers which route worked / failed',
+    'fyp.mjs protect --url <site> --setting "<label>" [--n 10] [--gap 3] [--out dir]   how does the site\'s protection treat this agent? (measures, never evades)',
+    'fyp.mjs login                      sign in to the live app with the vault login',
+    'fyp.mjs vault status|set|clear     where the live login is kept (never printed)',
     'common: [--viewport 410x779] [--headed] [--url http://host:port]',
+    'live:   [--live] [--login]   --live opens the app WITHOUT demo mode; --login signs in from the vault',
+    'gated site: set FYP_CF_ACCESS_ID + FYP_CF_ACCESS_SECRET (Cloudflare Access service token)',
   ] }, cmd ? 0 : 2);
 }
+
+if (cmd === 'vault') {
+  const v = await import('./vault.mjs');
+  const sub = args._[1] || 'status';
+  if (sub === 'status') emit({ ok: true, ...v.status() }, 0);
+  if (sub === 'set') { const r = v.setLogin(); emit(r, r.ok ? 0 : 2); }
+  if (sub === 'clear') emit(v.clearLogin(), 0);
+  emit({ ok: false, error: 'usage', userMessage: 'vault takes status, set or clear.' }, 2);
+}
+
+if (cmd === 'routines') {
+  emit({ ok: true, routines: loadRoutines().map((r) => ({ name: r.name, steps: r.steps.length, phrases: r.phrases || [], params: Object.keys(r.params || {}), start: r.start && r.start.screen })) }, 0);
+}
+
+// say "<what the user asked>": map one sentence to a tool call, or say honestly
+// why not. Nothing is run unless the sentence maps exactly (see nl.mjs).
+if (cmd === 'say') {
+  const { understand, spokenSummary } = await import('./nl.mjs');
+  speakIt = !!args.speak;
+  const utterance = args._.slice(1).join(' ');
+  const u = understand(utterance, loadRoutines());
+  if (u.kind === 'ask') emit({ ok: false, needsUser: true, error: 'need-more', heard: u.heard, question: u.question, userMessage: u.question, spoken: u.question }, 1);
+  if (u.kind !== 'tool') emit({ ok: false, needsUser: true, error: 'not-understood', heard: u.heard || utterance, userMessage: u.userMessage, spoken: u.userMessage }, 1);
+  const tool = u.tool;
+  decorate = (res) => ({ heard: u.heard, understoodAs: { tool, params: u.params }, ...res, spoken: spokenSummary(tool, res) });
+  if (tool === 'routine') { cmd = 'routine'; args._ = ['routine', u.params.name]; args.params = JSON.stringify(u.params.values); }
+  else if (tool === 'create_post') { cmd = 'run'; args.caption = u.params.caption; }
+  else cmd = { accessibility_survey: 'survey', status: 'status', describe: 'describe' }[tool];
+}
+
+// Live mode: the real app, with its login screen, instead of the offline demo.
+const live = !!(args.live || args.login || cmd === 'login');
+let login = null;
+if (args.login || cmd === 'login') {
+  const { getLogin } = await import('./vault.mjs');
+  login = getLogin();
+  if (!login) emit({ ok: false, needsUser: true, error: 'no-login-stored', userMessage: 'No login is stored. Run "node agent/fyp.mjs vault set" in your own terminal (or set FYP_LOGIN_EMAIL and FYP_LOGIN_PASSWORD), then try again.' }, 1);
+  secrets.add(login.email); secrets.add(login.password);
+}
+const accessHeaders = (process.env.FYP_CF_ACCESS_ID && process.env.FYP_CF_ACCESS_SECRET)
+  ? { 'CF-Access-Client-Id': process.env.FYP_CF_ACCESS_ID, 'CF-Access-Client-Secret': process.env.FYP_CF_ACCESS_SECRET } : null;
+if (accessHeaders) secrets.add(process.env.FYP_CF_ACCESS_SECRET);
 
 let playwright;
 try { playwright = await import('playwright'); } catch (e) {
@@ -52,6 +143,22 @@ try { playwright = await import('playwright'); } catch (e) {
 }
 
 const [vw, vh] = String(args.viewport || '410x779').split('x').map(Number);
+
+// protect: N fresh paced trials against a hosted site, each sorted into what its
+// protection layer did. Measures and reports only (see protect.mjs).
+if (cmd === 'protect') {
+  if (typeof args.url !== 'string') emit({ ok: false, error: 'usage', userMessage: 'protect needs --url <https://your-site> and a label, e.g. --setting "bot fight mode"' }, 2);
+  const { runProtect } = await import('./protect.mjs');
+  const res = await runProtect({
+    playwright, base: args.url.replace(/\/$/, ''), n: Math.max(1, Math.min(100, Number(args.n) || 5)),
+    setting: typeof args.setting === 'string' ? args.setting : 'unlabelled',
+    gapMs: Math.max(0, Number(args.gap) >= 0 && args.gap !== undefined ? Number(args.gap) * 1000 : 3000),
+    viewport: { width: vw, height: vh }, headers: accessHeaders, out: typeof args.out === 'string' ? args.out : null,
+    headed: !!args.headed, log,
+  });
+  emit(res, 0);
+}
+
 let served = null;
 let base = args.url;
 if (!base) { served = await startServer(0); base = served.url; }
@@ -63,8 +170,17 @@ try {
   if (served) served.server.close();
   emit({ ok: false, error: 'browser-missing', userMessage: 'Chromium could not start. Run "bash agent/setup.sh" (add --with-deps on bare Linux). Detail: ' + String(e.message).split('\n')[0] }, 2);
 }
-const page = await (await browser.newContext({ viewport: { width: vw, height: vh } })).newPage();
+const page = await (await browser.newContext({ viewport: { width: vw, height: vh }, ...(accessHeaders ? { extraHTTPHeaders: accessHeaders } : {}) })).newPage();
 page.on('pageerror', (e) => log('pageerror:', e.message));
+
+// A rate limit shows up as refused sub-requests (HTTP 429), not as a broken page.
+// Name it, so the user is not told to "check the build" when the site is throttling.
+let throttled = 0;
+page.on('response', (r) => { if (r.status() === 429) throttled++; });
+const notReady = (msg) => throttled
+  ? { ok: false, needsUser: true, error: 'rate-limited', suppression: { kind: 'rate-limit', status: 429, refused: throttled },
+      userMessage: 'The site is limiting how fast I can load it (HTTP 429, ' + throttled + ' requests refused), so the app did not finish loading. I will not try to get around that. Wait a little and ask again, or ask the site owner to allow this assistant.' }
+  : { ok: false, error: 'not-ready', userMessage: msg };
 
 async function finish(result, code) {
   await browser.close().catch(() => {});
@@ -73,11 +189,46 @@ async function finish(result, code) {
 }
 
 try {
-  await page.goto(base + '/?demo=1&nc=' + Date.now(), { waitUntil: 'load' });
-  const ready = await page.evaluate(() => (window.__FYP_AGENT ? window.__FYP_AGENT.ready(30000) : false));
-  if (!ready) await finish({ ok: false, error: 'not-ready', userMessage: 'The app or harness did not finish loading. Check that demo/ is a current build.' }, 2);
+  // `fn` may be nested, e.g. "memory.clear"
+  const call = (fn, ...a) => page.evaluate(([f, x]) => {
+    const parts = f.split('.');
+    const owner = parts.slice(0, -1).reduce((o, k) => o[k], window.__FYP_AGENT);
+    return owner[parts[parts.length - 1]](...x);
+  }, [fn, a]);
 
-  const call = (fn, ...a) => page.evaluate(([f, x]) => window.__FYP_AGENT[f](...x), [fn, a]);
+  const nav = await page.goto(base + (live ? '/?nc=' : '/?demo=1&nc=') + Date.now(), { waitUntil: 'load' });
+
+  // Name a protective block as what it is. The runner reports it and stops: it
+  // does not wait out, solve or route around a challenge (plan 2.4, hard rule 1).
+  const hdr = nav ? nav.headers() : {};
+  const title = await page.title().catch(() => '');
+  const mitigated = hdr['cf-mitigated'] || null;                 // e.g. "challenge"
+  const challengeTitle = /just a moment|attention required|verify you are human/i.test(title);
+  if (mitigated || (nav && [403, 429, 503].includes(nav.status()) && challengeTitle)) {
+    await finish({
+      ok: false, needsUser: true, error: 'blocked-by-protection',
+      suppression: { kind: mitigated || 'block-page', status: nav ? nav.status() : null, by: hdr.server || null, rayId: hdr['cf-ray'] || null },
+      userMessage: 'The site is behind a protection check (' + (mitigated || 'block page') + ', HTTP ' + (nav ? nav.status() : '?') + ') and I was not let through. I will not try to get around it. You may need to open the page yourself, or ask the site owner to allow this assistant.',
+    }, 1);
+  }
+  if (live) {
+    // The login form comes first, so ready() (which needs the feed) cannot be asked yet.
+    await page.waitForFunction(() => !!window.__FYP_AGENT, null, { timeout: 30000 }).catch(() => {});
+    const alive = await page.evaluate(() => (window.__FYP_AGENT ? window.__FYP_AGENT.alive(30000) : null));
+    if (!alive) await finish(notReady('The live app or harness did not finish loading. Check the URL and, if the site sits behind Cloudflare Access, the FYP_CF_ACCESS_* token.'), throttled ? 1 : 2);
+    if (alive.loginScreen) {
+      if (!login) await finish({ ok: false, needsUser: true, error: 'login-required', userMessage: 'The app is asking for a login. Run again with --login (store the login first with "fyp.mjs vault set").' }, 1);
+      log('login screen up; signing in from the vault (' + login.source + ')');
+      const res = await call('login', { email: login.email, password: login.password });
+      if (!res.ok) await finish(res, 1);
+      if (cmd === 'login') await finish({ ...res, status: await call('status') }, 0);
+      await call('resetApp');           // lands on the feed and records the baseline
+    } else if (cmd === 'login') {
+      await finish({ ok: true, alreadySignedIn: true, status: await call('status') }, 0);
+    }
+  }
+  const ready = await page.evaluate(() => (window.__FYP_AGENT ? window.__FYP_AGENT.ready(30000) : false));
+  if (!ready) await finish(notReady(live ? 'Signed in, but the feed did not finish loading.' : 'The app or harness did not finish loading. Check that demo/ is a current build.'), throttled ? 1 : 2);
 
   if (cmd === 'describe') await finish(await call('describe'), 0);
   if (cmd === 'status') await finish(await call('status'), 0);
@@ -87,6 +238,7 @@ try {
       arm: args.arm === 'baseline' ? 'baseline' : 'healed',
       breaks: typeof args.breaks === 'string' ? args.breaks.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean) : [],
       caption: typeof args.caption === 'string' ? args.caption : undefined,
+      memory: !!args.memory,
     };
     log('run', JSON.stringify(opts));
     const res = await call('runFlow', opts);
@@ -119,6 +271,99 @@ try {
       res.savedTo = path.resolve(args.out);
     }
     await finish({ ok: true, summary: res.summary, savedTo: res.savedTo || null }, 0);
+  }
+
+  // teach: the user does a task ONCE by hand in a real window; the harness turns it
+  // into steps with a learned success check for each. Refuses what it cannot verify.
+  if (cmd === 'teach') {
+    if (typeof args.name !== 'string') await finish({ ok: false, error: 'usage', userMessage: 'teach needs --name <routine.name>, e.g. --name like.first --say "like the first post"' }, 2);
+    if (!args.headed) await finish({ ok: false, error: 'usage', userMessage: 'Teaching needs a window you can use: add --headed.' }, 2);
+    const started = await call('teach.start', args.name);
+    if (!started.ok) await finish(started, 2);
+    log('RECORDING "' + args.name + '". Do the task once in the browser window, then press Enter here.');
+    await new Promise((resolve) => { process.stdin.resume(); process.stdin.once('data', resolve); });
+    const res = await call('teach.stop');
+    if (!res.ok) await finish(res, 1);
+    if (typeof args.say === 'string') res.routine.phrases = [args.say];
+    fs.mkdirSync(ROUTINES, { recursive: true });
+    const file = path.join(ROUTINES, args.name.replace(/[^a-z0-9._-]+/gi, '_') + '.json');
+    fs.writeFileSync(file, JSON.stringify(res.routine, null, 2) + '\n');
+    await finish({ ok: true, saved: path.relative(process.cwd(), file), name: args.name, steps: res.routine.steps.length, readback: res.readback, params: res.routine.params, phrases: res.routine.phrases, warnings: res.warnings }, 0);
+  }
+
+  if (cmd === 'routine') {
+    const name = args._[1];
+    const routine = loadRoutines().find((r) => r.name === name);
+    if (!routine) await finish({ ok: false, error: 'unknown-routine', userMessage: 'I have not been taught "' + name + '". Taught so far: ' + (loadRoutines().map((r) => r.name).join(', ') || 'nothing') + '.' }, 2);
+    // Replay where it was taught: positions are the one thing that moves with window size.
+    if (!args.viewport && routine.viewport && (routine.viewport.w !== vw || routine.viewport.h !== vh)) {
+      log('resizing to the taught viewport ' + routine.viewport.w + 'x' + routine.viewport.h);
+      await page.setViewportSize({ width: routine.viewport.w, height: routine.viewport.h });
+      await page.waitForTimeout(600);
+      await page.evaluate(() => window.__FYP_AGENT.ready(15000));
+    }
+    let params = {};
+    try { if (typeof args.params === 'string') params = JSON.parse(args.params); } catch { await finish({ ok: false, error: 'usage', userMessage: '--params must be JSON, e.g. --params \'{"comment":"nice"}\'' }, 2); }
+    if (typeof args.param === 'string' && args.param.includes('=')) { const [k, ...v] = args.param.split('='); params[k] = v.join('='); }
+    const res = await call('runRoutine', {
+      routine, params, memory: !!args.memory,
+      arm: args.arm === 'baseline' ? 'baseline' : 'healed',
+      breaks: typeof args.breaks === 'string' ? args.breaks.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean) : [],
+    });
+    await finish(res, res.ok ? 0 : res.error ? 2 : 1);
+  }
+
+  // Does remembering routes pay off when the UI changes? Same page, R runs back to
+  // back; the first `--drift-at` runs are on the healthy app, then the breaks arrive.
+  // Run once with memory on and once with it off and compare what each wasted.
+  if (cmd === 'learn') {
+    const runs = Math.max(2, Number(args.runs) || 8);
+    const driftAt = Math.min(runs - 1, Math.max(1, Number(args['drift-at']) || 3));
+    const breaks = (typeof args.breaks === 'string' ? args.breaks : 'B1,B6').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+    const arms = {};
+    for (const arm of ['memory', 'plain']) {
+      await call('memory.clear');
+      arms[arm] = { runs: [] };
+      for (let r = 1; r <= runs; r++) {
+        const armed = r > driftAt ? breaks : [];
+        log('learn ' + arm + ' run ' + r + '/' + runs + (armed.length ? ' breaks=' + armed.join('+') : ' (healthy)'));
+        const res = await call('runFlow', { breaks: armed, memory: arm === 'memory' });
+        const rows = res.rows || [];
+        arms[arm].runs.push({
+          run: r, breaks: armed, ok: !!res.ok, stepsOk: res.stepsOk,
+          failedActions: rows.reduce((s, x) => s + (x.failedActions || 0), 0),
+          ms: rows.reduce((s, x) => s + (x.ms || 0), 0),
+          routes: rows.map((x) => x.route),
+        });
+      }
+      if (arm === 'memory') arms[arm].memory = await call('memory.summary');
+    }
+    const after = (a) => arms[a].runs.filter((x) => x.run > driftAt);
+    const mean = (xs) => (xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 10) / 10 : null);
+    // Runs to settle, per arm: from the run where the change first appeared (counted
+    // as 1) to the first run in which no action was wasted. null = never, within `runs`.
+    const settleOf = (a) => { const hit = after(a).find((x) => x.failedActions === 0); return hit ? hit.run - driftAt : null; };
+    const out = {
+      ok: true, driftAt, runs, breaks,
+      summary: {
+        afterDrift: {
+          memory: { meanFailedActions: mean(after('memory').map((x) => x.failedActions)), meanMs: mean(after('memory').map((x) => x.ms)), fullFlows: after('memory').filter((x) => x.ok).length },
+          plain: { meanFailedActions: mean(after('plain').map((x) => x.failedActions)), meanMs: mean(after('plain').map((x) => x.ms)), fullFlows: after('plain').filter((x) => x.ok).length },
+        },
+        runsToSettle: { memory: settleOf('memory'), plain: settleOf('plain') },
+        note: 'runsToSettle = runs from the one where the UI change first appeared (counted as 1) to the first run that wasted no action; null = did not settle within the runs given. A wasted action is a route that resolved to one control, was acted on and did not achieve the goal. B1 re-randomises hook names every run, so per-intent drift counts in arms.memory.memory are high by design.',
+      },
+      arms,
+    };
+    if (typeof args.out === 'string') {
+      fs.mkdirSync(args.out, { recursive: true });
+      fs.writeFileSync(path.join(args.out, 'learn.json'), JSON.stringify(out, null, 2));
+      const lines = ['arm,run,breaks,ok,steps_ok,failed_actions,ms'];
+      for (const [arm, a] of Object.entries(arms)) for (const x of a.runs) lines.push([arm, x.run, x.breaks.join('+') || 'clean', x.ok, x.stepsOk, x.failedActions, x.ms].join(','));
+      fs.writeFileSync(path.join(args.out, 'learn.csv'), lines.join('\n') + '\n');
+      out.savedTo = path.resolve(args.out);
+    }
+    await finish(out, 0);
   }
 
   await finish({ ok: false, error: 'unknown-command', userMessage: 'Unknown command: ' + cmd }, 2);

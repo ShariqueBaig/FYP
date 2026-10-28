@@ -1,5 +1,7 @@
 # AGENTS.md - read this first (for Momo and any other coding/ops agent)
 
+> **Full guide to everything built, how to run it and what is tested: [`Kenna/README.md`](Kenna/README.md).** This file is the rules and the command table.
+
 **Project:** intent-aware, self-healing GUI automation for accessible AI assistants
 (FYP: Sharique Baig, Maira Aijaz, Barkhi Khan). All work lives in `Kenna/`.
 
@@ -33,6 +35,13 @@ Firebase and no `node_modules` for the app.
 | `intent <id>` | one intent (fresh page each call: only `post.open` is valid cold) |
 | `survey` | per-screen count of controls with no accessible name / role |
 | `experiment --n 3 --set demo --out results/` | baseline vs healed over break configs; writes JSON + CSVs |
+| `say "post a photo with caption hello" [--speak]` | plain English in, one JSON out with `heard`, `understoodAs` and `spoken`; asks (`need-more`) or declines (`not-understood`) instead of guessing |
+| `teach --name like.first --say "like the first post" --headed` | the human does a task once; it learns steps + a success check each; refuses unverifiable steps; never records passwords. Saves `agent/routines/<name>.json` |
+| `routines` / `routine <name> [--params '{...}'] [--breaks B1] [--arm baseline]` | list / replay taught routines through the healing ladder |
+| `learn --runs 8 --drift-at 3 --breaks B1,B6` | route-memory experiment: memory on vs off after the UI changes (failed actions, time, runs to settle) |
+| `protect --url <site> --setting "<label>" --n 10 --out results/protection` | how a site's protection layer treats this agent; measures and reports only, never evades |
+| `login` / `run --login` | live app only: sign in with the vault login, then (for `run`) do the flow. Use `--live --url <site>` |
+| `vault status\|set\|clear` | where the live login is kept. `set` is typed by the human, never by an agent. Status never prints the password |
 
 Common flags: `--viewport 410x779` (default), `--headed`, `--url <already-served app>`.
 
@@ -64,7 +73,8 @@ bash Kenna/fyp-mvp/sync-demo.sh      # copies dist -> Kenna/demo (without the ha
    (plan 2.4, 11.4). Report suppression mechanisms and rates; do not build a bypass.
 2. **Never hold a handle across an action; never count "no exception" as success**; the
    success signal is the predicate on the next screen.
-3. **No secrets in the repo.** `Kenna/insta clone/liveConfig.ts` holds a login for the *live* Firebase
+3. **No secrets in the repo, in a bundle, or in output.** The live login goes only through `agent/vault.mjs`; never print, log, paste or commit it. An agent must not ask the user to type a password into chat.
+   `Kenna/insta clone/liveConfig.ts` holds a login for the *live* Firebase
    path and must never be committed or copied here. The demo needs none.
 4. Do not claim Android results from the web demo (plan section 11.2 has the honest wording).
 5. After editing `harness.js`, run `node --check Kenna/fyp-mvp/harness.js` and a clean

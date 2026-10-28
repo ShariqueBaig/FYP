@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "name": "like.first",
+  "createdAt": "2026-10-28T16:47:07.207Z",
+  "start": {
+    "screen": "feed"
+  },
+  "viewport": {
+    "w": 1600,
+    "h": 900
+  },
+  "params": {},
+  "phrases": [
+    "like the first post",
+    "like the top post"
+  ],
+  "steps": [
+    {
+      "n": 1,
+      "action": "click",
+      "target": {
+        "hook": "like-ag-1",
+        "label": "Like",
+        "text": "",
+        "tag": "div",
+        "role": "",
+        "placeholder": "",
+        "region": "gallery-grid",
+        "geo": {
+          "x": 0.076,
+          "y": 0.502,
+          "docY": 830,
+          "w": 46,
+          "h": 31
+        },
+        "path": "div:nth-child(1)>div:nth-child(1)>div:nth-child(1)>div:nth-child(1)>div:nth-child(2)>div:nth-child(1)>div:nth-child(3)>div:nth-child(3)>div:nth-child(1)>div:nth-child(1)",
+        "group": {
+          "by": "hook",
+          "key": "like-ag",
+          "size": 11,
+          "ordinal": 0
+        },
+        "labelGroup": {
+          "by": "label",
+          "key": "Like",
+          "size": 15,
+          "ordinal": 0
+        }
+      },
+      "desc": "Tap \"Like\" (the first of 11)",
+      "value": null,
+      "evidence": {
+        "typed": false,
+        "appeared": [],
+        "gone": [],
+        "ctl": [],
+        "style": {
+          "before": "d1bda2f5",
+          "after": "237d6dc9"
+        }
+      },
+      "check": "the control changes look",
+      "final": true
+    }
+  ]
+}

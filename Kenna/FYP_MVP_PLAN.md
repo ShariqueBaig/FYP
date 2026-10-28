@@ -552,3 +552,76 @@ The mockup was restyled (dark Instagram theme, `pkAssets.ts`). All harness hooks
 - **Accessibility survey (new design):** feed 3/10, gallery 1/13, caption 0/11, more-options 5/8 controls with no accessible name; **every control on every screen exposes no role** (all are bare `div[tabindex]`).
 - **Fixed:** `gallery.select` fell back to vision (about 4.8 s) on every run after the first, because the app keeps the previous selection and the id route re-clicked the selected cell. The selection fade sits on a wrapper *above* the image element, so the opacity read was always 1; it now composes opacity down the tree, and the intent picks a cell that is not already selected. Clean runs now use `id` (about 0.7 s).
 - **Gotcha, cost me a wrong test run:** after a rebuild the static server and the browser cache can both serve the **old** `index.html`, which points at a bundle name that no longer exists. Restart the server and load `?demo=1&nc=N` (any new `nc`) after every rebuild, and check that the loaded `AppEntry-<hash>.js` matches `dist/_expo/static/js/web/`.
+
+### 2026-10-28 - hosting, and a deliberate scope addition: login against the live app
+
+- **Hosting.** `fyp-mvp/make-site.sh` assembles `site/` (demo + harness + html2canvas + `vercel.json`). Deployed to Vercel as `kenna-fyp`, and served at `insta.shariquebaig.com` through Cloudflare (DNS moved to Cloudflare; registrar stays Spaceship). Measured against the hosted copy: clean 9/9, B1+B4 9/9, B8 stops honestly at step 1.
+- **Scope addition (decided by the student, recorded here as the plan asks).** The agent can now sign in to the **live** Firebase app, not only the offline demo. Offline demo mode is unchanged and still the default, so decision 2.3-3 holds. New: `login` command, `--live` / `--login` flags, `agent/vault.mjs`.
+- **Credentials never enter the repo, a bundle, or output.** The build blanks `liveConfig.ts` (verified: the deployed bundle contains neither the email nor the password). The login lives in a vault read by the runner: env `FYP_LOGIN_EMAIL`/`FYP_LOGIN_PASSWORD`, or a Windows DPAPI file `agent/.vault/login.json` (git-ignored; encrypted for that Windows user on that machine). `vault set` is typed by the user at a hidden prompt. The runner scrubs the secrets from the one JSON document; the harness holds them in a closure only and wipes the form on a failed attempt.
+- **Login is not a ladder intent.** It is an agent command with the same honest-failure contract (`needsUser`, `userMessage`), success = the feed's tab bar appears. Making it a scored intent (and part of `experiment`) is future work.
+- **Tested** against a localhost stub with fake credentials: good login, wrong password (stops honestly), no stored login, DPAPI round trip, and a scan showing the secrets appear nowhere in stdout/stderr. **Not tested against the real Firebase account.**
+- **Open risks, see section 8 item 8.** Firestore rules let *any signed-in user* read and write, and the app has a public sign-up. On a public URL that means anyone can create an account and write. Protect the live path (Cloudflare Access, or disable sign-ups) before sharing the link; rotate the password in `liveConfig.ts` (it is in the app repo's git history).
+
+### 2026-10-28 - first protection measurements: the harness behind Cloudflare (free plan)
+
+Target: `https://insta.shariquebaig.com` (Vercel origin behind the Cloudflare proxy), headless Playwright Chromium, university network, offline demo bundle, clean app (no breaks).
+
+| setting | agent result | what Cloudflare did |
+|---|---|---|
+| no rules | 9/9, completed | request allowed |
+| Bot Fight Mode on | 9/9, completed | not challenged |
+| custom rule: Managed Challenge on the hostname | **0/9, stopped honestly** | HTTP 403, `cf-mitigated: challenge` (same for plain `curl`) |
+
+- **Reading:** Bot Fight Mode did not stop a headless browser on this page; an explicit challenge rule stops everything that cannot pass an interactive check, so it is suppression by a *gate in front of the app* (S1/S3-class: no route reaches the page), not by anything the harness can heal from inside.
+- **Honest-failure fix.** Before this, the runner reported the block as `not-ready: check that demo/ is a current build` - wrong cause. It now returns `blocked-by-protection` with `suppression {kind, status, by, rayId}` and exit 1, and says it will not get around the check. It never waits out, solves or routes around a challenge (plan 2.4, hard rule 1).
+- Only mechanisms and rates are reported. Legitimate access for the owner's own agent is by allow-listing (Cloudflare Access service token or an owner-controlled WAF skip rule), not by evasion.
+- Single runs per setting so far; repeat N times before quoting rates.
+
+### 2026-10-28 - route memory, plain-English front end, protection probe
+
+**1. Route memory (`harness.js` 4b; opt-in with `run --memory`).** Per intent the harness remembers the route that last achieved the goal (tried first next time) and routes that resolved to one control, were acted on and had no effect (skipped while the screen looks the same). A structural screen signature (hooks + labels, no positions/text) detects drift and forgets the skip list. Memory only reorders and prunes: every route still has to resolve to exactly one control and the success predicate still decides, so it cannot turn a failure into a success. The recorded-locator baseline never learns. New log columns `failed_actions`, `memory` (appended; older columns unchanged).
+
+Measured with `learn` (same page, 10 back-to-back runs, healthy for the first 3, then the break arrives; memory vs no memory; one sequence per setting, so a first result, not a rate):
+
+| break | arm | failed actions per run after the change | mean time per full flow | runs to settle |
+|---|---|---|---|---|
+| B1+B6 (ids renamed, labels swapped for bare icons) | memory | 3 then 0 for every later run (mean 0.4) | 6.2 s | 2 |
+| | no memory | 3 every run (mean 3.0) | 11.3 s | never |
+| B7 (obscured tap) | memory | 4 every run | 5.4 s | never |
+| | no memory | 4 every run | 5.4 s | never |
+
+Reading: memory removes repeated wrong-element misses, which is where the ladder pays a verification timeout each time. It does **not** help B7: an obscured tap is not a wrong-element miss, the keyboard fallback is already cheap, and memory has nothing to prune. Reported as a limit, not hidden. "Runs to settle" = runs from the one where the change first appears (counted as 1) to the first with no wasted action. B1 re-randomises hook names every run, so per-intent drift counts are high by design; the run-level measure is the one to quote.
+
+**2. Plain-English front end (`agent/nl.mjs`, `fyp.mjs say`).** Rule-based on purpose: offline, free, deterministic, unit-tested (`node agent/nl.test.mjs`, 11 cases). It maps a sentence to create_post / accessibility_survey / status / describe, asks one question when a fact is missing (the caption: it never invents one), and declines what it cannot do (delete, like, comment...) instead of guessing. Results carry `heard`, `understoodAs` and a first-person `spoken` sentence; `--speak` reads it with Windows speech (the speech call was not checked by ear). The harness also narrates each step and any honest failure through a visually hidden `aria-live` region; not yet tried with a screen reader. An LLM planner can later sit in front and emit the same `{tool, params}`.
+
+**3. Protection probe (`agent/protect.mjs`, `fyp.mjs protect`).** N fresh, paced (default 3 s), unmodified trials per setting, each sorted into completed / challenged / access-gated / rate-limited / blocked / http-error / incomplete / unreachable, with 95% Wilson intervals, appended to `results/protection.csv`. Measures and reports only; it never solves, spoofs or waits out a challenge (plan 2.4). A rate limit is now named as such (`rate-limited`, HTTP 429) instead of "not-ready". Classifier unit-tested (`node agent/protect.test.mjs`). First probe, site as configured at the time (no challenge rule active): 5/5 completed. **Still to measure, once configured in Cloudflare:** rate-limit rule, Access without token, Access with token; then 10+ trials per setting.
+
+Regression after all of the above: clean 9/9, B1+B4 9/9, B8 stops honestly at step 1, `--memory` 9/9, experiment CSV export intact.
+
+### 2026-10-28 - teach by demonstration (scope addition, decided by the student)
+
+The user does a task ONCE; the harness turns it into steps and replays them through the same ladder as the built-in flow. This removes the "nine hand-written intents" limit: a taught step is the same kind of description the ladder already runs on, so healing, route memory, the keyboard route, honest failure and the breaks all apply unchanged.
+
+**What is recorded** (`harness.js` section 11; trusted events only, so the harness's own synthetic taps are never recorded): for each tap or typed field, a description of the control (hook, label, text, placeholder, position among look-alikes such as "the first of 11 Like buttons", where it sat inside its scrolling content, size) and a **success check learned from a before/after diff**: controls that newly appeared (by their most stable name), text that appeared, the control's own look changing, the typed value. A step whose effect cannot be seen is **refused**, not saved. Typed text becomes a parameter. A password field is never recorded. A focus click followed by typing is folded into the typing step. A step is closed the moment the next action starts, so it is never credited with what the next step did. A taught toggle already in the wanted state is skipped, not undone.
+
+**Taught:** `like.first` (1 step: tap the first Like) and `comment.first` (3 steps: open comments, type {comment}, tap Post). `say "like the first post"` and `say 'comment "lovely photo" on the first post'` now run them.
+
+**Measured** (`agent/results/routines/matrix.csv`; 11 configurations x 2 arms x 2 routines = 44 replays, one run each, so a first result, not a rate; replayed at the window size taught, 1600x900). Baseline = recorded locators (id, else label, placeholder, visible text, else path), with its effect checked separately from "the click did not throw".
+
+| configuration | like.first healed | like.first baseline | comment.first healed | comment.first baseline |
+|---|---|---|---|---|
+| clean, B2, B3, B4, B5, B6, B7, B8 | 1/1 | 1/1 | 3/3 | 3/3 |
+| B1 (ids renamed) | 1/1 (label) | **0/1** | 3/3 (text, vision, label) | **1/3** |
+| B1+B2 (ids and labels gone) | 1/1 (vision) | **0/1** | 3/3 | **1/3** |
+| B1+B2+B3 (and order shuffled) | **0/1, stops honestly** | 0/1 | 3/3 | **1/3** |
+
+Reading: the recorded-locator baseline fails exactly where the plan predicts, on renamed ids; the healed arm recovers through label, text and the position route, and fails only when every name is gone AND the layout is shuffled, where it stops and says so (like.first, B1+B2+B3). Most breaks do not touch these particular controls, so the table is not a claim that every break matters; it shows the taught path behaves like the built-in one.
+
+**Honest limits.**
+- One demonstration is one example: no branches, no "if a popup appears".
+- A check is learned from one state. Structural evidence (new controls) is preferred over content-specific text for that reason, but a check can still be too weak or too strict; the read-back ("done when ...") is shown so the user can catch that.
+- "The first of N" is stable, "number 7 of 15" is not (the list changes).
+- The position route is only reliable at the window size the routine was taught at; the runner resizes to it by default. At another size, expect it to fail honestly.
+- Two routines, one app. A second app and more routines are the next test.
+- The baseline was first unfair (an absolute path for a text-only control, so it failed on the clean app); fixed to what a normal recorder produces, then re-measured. Quote only the fixed numbers.
+- Taught in a scripted demonstration (`agent/teach.demo.mjs`, real mouse and keyboard); `fyp.mjs teach --headed` for a person is built but has not been tried by a person yet.
