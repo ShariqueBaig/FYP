@@ -290,7 +290,10 @@
   // The success signal is always a predicate checked afterwards - never "no
   // exception was thrown".
   // ===========================================================================
-  const CAPTION_TEXT = 'fyp demo post';
+  // Mutable so an assistant can post what the user actually asked for (see the
+  // agent API at the bottom of this file); the demo default is unchanged.
+  const DEFAULT_CAPTION = 'fyp demo post';
+  let CAPTION_TEXT = DEFAULT_CAPTION;
 
   const INTENTS = [
     {
@@ -392,7 +395,7 @@
       // identifies this field is that it is the first text area on the screen.
       visionKind: 'textarea',
       ordinal: 0,
-      value: CAPTION_TEXT,
+      get value() { return CAPTION_TEXT; },
       success: () => {
         const el = document.querySelector('[data-testid="caption-input"], textarea[placeholder*="caption" i], input[placeholder*="caption" i]');
         return !!el && (el.value || '') === CAPTION_TEXT;
@@ -793,7 +796,9 @@
     runs: { healed: null, baseline: null },
     baseline: {}, // intent id -> one hard-coded locator, captured once
     recorded: false, // has the healthy app been walked and the recording stored?
-    prog: '', // live breadcrumb: which intent / route / candidate is running
+    stop: false, // set by the Stop button; checked between intents
+    current: null, // id of the intent being run right now
+    busySince: 0,
     recording: false, // true while that walk runs, so it is not logged as evidence
     chaos: { active: {}, undo: [] },
     lastFatal: '',
@@ -804,14 +809,27 @@
     survey: null, // per-screen accessibility measurement
   };
 
+  // Live breadcrumb: which intent / route / candidate is running. A setter, so
+  // every update repaints the status bar without each call site asking.
+  let progText = '';
+  Object.defineProperty(state, 'prog', {
+    enumerable: true,
+    get: () => progText,
+    set: (v) => { progText = v; if (typeof render === 'function') render(); },
+  });
+
+  const stopped = () => state.stop || state.exp.stop;
+
   function logRow(row) {
     // A baseline RECORDING pass is not an experiment result - it is the act of
     // writing the script. Logging it would double every row in the scoreboard.
     if (state.recording) return row;
-    row.timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);      row.run = state.runId;
+    row.timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    row.run = state.runId;
     row.rep = state.ctx.rep;
     row.config = Object.keys(state.chaos.active).sort().join('+') || 'clean';
     state.log.push(row);
+    saveLogSoon();
     render();
     return row;
   }
@@ -821,8 +839,19 @@
   // ===========================================================================
   let running = false;
 
-  /** One intent, healed: walk the ladder, act, then verify the predicate. */
+  /** One intent, healed - marks it as the live step while it runs. */
   async function runIntent(intent, opts) {
+    if (!state.recording) { state.current = intent.id; render(); }
+    try {
+      return await runIntentCore(intent, opts);
+    } finally {
+      state.current = null;
+      state.prog = '';
+    }
+  }
+
+  /** The ladder itself: walk the routes, act, then verify the predicate. */
+  async function runIntentCore(intent, opts) {
     const t0 = now();
     const cs = await settle();
     const fp = fingerprint(cs);
@@ -905,7 +934,7 @@
       }
 
       const multi = candidates.length > 1;
-    state.prog = intent.id + ' · ' + route.name + (multi ? ' [' + candidates.length + ']' : ' — 1 candidate');
+      state.prog = intent.id + ' · ' + route.name + (multi ? ' [' + candidates.length + ']' : ' — 1 candidate');
 
       for (let j = 0; j < candidates.length; j++) {
         const tag = route.name + (multi ? '[' + j + ']' : '');
@@ -1061,6 +1090,7 @@
     running = true;
     state.runId++;
     state.runs.baseline = null;
+    if (!state.exp.active) state.stop = false;
     render();
 
     // Reset (which ensures the recording exists), then re-arm the breaks. The
@@ -1072,8 +1102,11 @@
 
     const rows = [];
     let ok = 0;
+    let halted = false;
     for (let i = 0; i < INTENTS.length; i++) {
+      if (stopped()) { halted = true; break; }
       const intent = INTENTS[i];
+      state.prog = 'baseline · ' + intent.id;
       const t0 = now();
       const sel = state.baseline[intent.id];
       let outcome = 'success';
@@ -1121,7 +1154,8 @@
         })
       );
     }
-    state.runs.baseline = { ok, total: INTENTS.length };
+    state.runs.baseline = { ok, total: INTENTS.length, stopped: halted };
+    state.prog = '';
     running = false;
     render();
   }
@@ -1198,6 +1232,7 @@
     state.runs.healed = null;
     state.lastFatal = '';
     state.lastShot = null;
+    if (!state.exp.active) state.stop = false;
     render();
 
     // Order matters. Reset needs intact hooks to navigate home, and the run must
@@ -1208,7 +1243,9 @@
     for (const k of armed) applyBreak(k);
 
     let ok = 0;
+    let halted = false;
     for (let i = 0; i < INTENTS.length; i++) {
+      if (stopped()) { halted = true; break; }
       const row = await runIntent(INTENTS[i], { order: i + 1 });
       if (row.outcome === 'success') ok++;
       else if (row.outcome !== 'failed-predicate') {
@@ -1221,7 +1258,7 @@
         break;
       }
     }
-    state.runs.healed = { ok, total: INTENTS.length };
+    state.runs.healed = { ok, total: INTENTS.length, stopped: halted };
     running = false;
     render();
   }
@@ -1288,7 +1325,30 @@
   }
 
   /** Put the app back on the feed, restoring hooks first so reset can work. */
+  /** If the login screen is up, sign in with the account from liveConfig.ts
+   *  (the app exposes it as window.FYP_LOGIN). No-op when already signed in. */
+  async function ensureLoggedIn() {
+    const user = document.querySelector('input[placeholder^="Phone number"]');
+    const pass = document.querySelector('input[placeholder="Password"]');
+    if (!user || !pass) return true;
+    const cred = window.FYP_LOGIN;
+    if (!cred || !cred.email || !cred.password) { flash('Login screen, but liveConfig.ts has no credentials.'); return false; }
+    typeInto(user, cred.email);
+    typeInto(pass, cred.password);
+    await sleep(250);
+    const btn = [...document.querySelectorAll('[tabindex],button,[role=button]')].find((e) => /^log in$/i.test((e.textContent || '').trim()));
+    if (!btn) { flash('Could not find the Log in button.'); return false; }
+    btn.click();
+    for (let i = 0; i < 60; i++) {           // up to ~15s for Firebase to answer
+      await sleep(250);
+      if (document.querySelector('[data-testid="tab-home"]')) { await settle(8, 120); return true; }
+    }
+    flash('Login did not complete - check liveConfig.ts and the Firebase console.');
+    return false;
+  }
+
   async function resetApp() {
+    if (!(await ensureLoggedIn())) return;
     clearChaos();
     await goHome();
     // The app is whole again - this is the honest moment to hold the baseline's
@@ -1665,18 +1725,6 @@
     render();
   }
 
-  function surveyHtml() {
-    const sv = state.survey;
-    if (!sv || !sv.length) return '<div class="fyp-muted" style="margin-top:6px">Press Re-measure to survey every screen.</div>';
-    const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
-    const T = sv.reduce((a, r) => ({ total: a.total + r.total, unnamed: a.unnamed + r.unnamed, notButton: a.notButton + r.notButton }), { total: 0, unnamed: 0, notButton: 0 });
-    return (
-      '<table class="fyp-log" style="margin-top:6px"><thead><tr><th>screen</th><th>controls</th><th>no name</th><th>no role</th></tr></thead><tbody>' +
-      sv.map((r) => '<tr><td>' + r.screen + '</td><td>' + r.total + '</td><td>' + r.unnamed + ' (' + pct(r.unnamed, r.total) + '%)</td><td>' + r.notButton + ' (' + pct(r.notButton, r.total) + '%)</td></tr>').join('') +
-      '<tr><td><b>all</b></td><td><b>' + T.total + '</b></td><td><b>' + T.unnamed + ' (' + pct(T.unnamed, T.total) + '%)</b></td><td><b>' + T.notButton + ' (' + pct(T.notButton, T.total) + '%)</b></td></tr>' +
-      '</tbody></table>'
-    );
-  }
 
   // ===========================================================================
   // 9c. Results: summary table, CSV export, and the N-times experiment
@@ -1748,8 +1796,8 @@
     return lines.join('\n');
   }
 
-  function download(name, text) {
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  function download(name, text, mime) {
+    const url = URL.createObjectURL(new Blob([text], { type: (mime || 'text/csv') + ';charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = name;
@@ -1759,28 +1807,6 @@
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
 
-  function resultsHtml() {
-    const rows = summarise();
-    const ex = state.exp;
-    const prog = ex.active
-      ? '<div class="fyp-muted" style="margin-bottom:6px">Running: round ' + ex.rep + ' of ' + ex.n + ' &middot; ' + ex.label + '</div>'
-      : '';
-    if (!rows.length) return prog + '<div class="fyp-muted">No runs yet. Run all, or Run N&times;.</div>';
-    return (
-      prog +
-      '<table class="fyp-log"><thead><tr><th>config</th><th>arm</th><th>runs</th><th>steps</th><th>flow done</th></tr></thead><tbody>' +
-      rows
-        .map((a) => {
-          const good = a.full === a.runs;
-          return (
-            '<tr class="' + (good ? 'ok' : 'bad') + '"><td title="' + a.config + '">' + a.config + '</td><td>' + a.arm + '</td><td>' + a.runs +
-            '</td><td>' + (a.steps / a.runs).toFixed(1) + '/' + a.total + '</td><td>' + a.full + '/' + a.runs + '</td></tr>'
-          );
-        })
-        .join('') +
-      '</tbody></table>'
-    );
-  }
 
   const PRESETS = {
     full: [[], ['B1'], ['B2'], ['B3'], ['B4'], ['B5'], ['B6'], ['B7'], ['B8'], ['B1', 'B2', 'B3', 'B4'], ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'], ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8']],
@@ -1809,211 +1835,679 @@
     } finally {
       state.ctx.rep = null;
       state.exp.active = false;
+      state.exp.stop = false;
+      state.stop = false;
       clearChaos();
       await resetApp();
       render();
     }
   }
 
-  function flash(msg) {
+
+
+
+  // ---------------------------------------------------------------------------
+  // Panel helpers
+  // ---------------------------------------------------------------------------
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const PREF_KEY = '__fyp_harness_prefs';
+  const LOG_KEY = '__fyp_harness_log';
+
+  function loadJson(k) {
+    try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; }
+  }
+  function saveJson(k, v) {
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
+  }
+
+  const prefs = Object.assign({ tab: 'run', dock: 'right', min: false, x: null, y: null, failOnly: false }, loadJson(PREF_KEY));
+  const savePrefs = () => saveJson(PREF_KEY, prefs);
+
+  // The attempt log survives a reload: an N-times experiment is worth keeping
+  // even if the page is refreshed halfway through reading it.
+  (function restoreLog() {
+    const saved = loadJson(LOG_KEY);
+    if (Array.isArray(saved.log)) {
+      state.log = saved.log;
+      state.runId = saved.runId || 0;
+      for (const r of state.log) if (r.arm !== 'baseline') state.runId = Math.max(state.runId, r.run || 0);
+    }
+  })();
+
+  let saveTimer = null;
+  function saveLogSoon() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveJson(LOG_KEY, { runId: state.runId, log: state.log.slice(-800) }), 400);
+  }
+
+  const openRows = new Set();
+  const GRADE_CLASS = { A: 'ga', 'A-B': 'gab', B: 'gb', D: 'gd', F: 'gf' };
+
+  const fmtMs = (ms) => (ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms');
+  const fmtClock = (ms) => {
+    const s = Math.floor(ms / 1000);
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  };
+
+  function flash(msg, kind) {
     const t = document.createElement('div');
     t.textContent = msg;
     t.setAttribute('data-fyp-toast', '1');
+    const accent = kind === 'bad' ? '#ff6b6b' : kind === 'ok' ? '#3ddc97' : '#6d8bff';
     t.style.cssText =
-      'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:100000;background:#111;color:#fff;' +
-      'border:1px solid #444;border-radius:8px;padding:8px 14px;font:13px/1.4 system-ui,sans-serif;';
+      'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100001;max-width:min(92vw,420px);' +
+      'background:#15171c;color:#e7e9ee;border:1px solid ' + accent + ';border-radius:10px;' +
+      'padding:10px 14px;font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 10px 40px rgba(0,0,0,.5);pointer-events:none;';
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2600);
+    setTimeout(() => t.remove(), 3000);
   }
 
-  function routeChips() {
+  // ---------------------------------------------------------------------------
+  // Dynamic fragments
+  // ---------------------------------------------------------------------------
+  function routeUsage() {
     const counts = {};
-    for (const r of state.log) if (r.arm !== 'baseline' && r.route) counts[r.route] = (counts[r.route] || 0) + 1;
-    const order = ['id', 'label', 'text', 'scoped', 'vision', 'none'];
-    return order
-      .filter((k) => counts[k])
-      .map((k) => '<span class="fyp-chip">' + k + ' x' + counts[k] + '</span>')
+    for (const r of state.log) if (r.arm !== 'baseline' && r.route) counts[r.route.split('[')[0].split('+')[0]] = (counts[r.route.split('[')[0].split('+')[0]] || 0) + 1;
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    if (!total) return '<div class="fyp-muted">No routes used yet.</div>';
+    const order = ['id', 'label', 'text', 'scoped', 'vision', 'precondition', 'predicate', 'none'];
+    return (
+      '<div class="fyp-usage">' +
+      order
+        .filter((k) => counts[k])
+        .map((k) => '<div class="fyp-use r-' + k + '" style="flex:' + counts[k] + '" title="' + k + ' x' + counts[k] + '"></div>')
+        .join('') +
+      '</div><div class="fyp-legend">' +
+      order.filter((k) => counts[k]).map((k) => '<span><i class="r-' + k + '"></i>' + k + ' ' + counts[k] + '</span>').join('') +
+      '</div>'
+    );
+  }
+
+  function scoreCard(label, a, tone) {
+    const pct = a ? Math.round((100 * a.ok) / a.total) : 0;
+    const cls = !a ? '' : a.ok === a.total ? 'ok' : a.ok === 0 ? 'bad' : 'warn';
+    return (
+      '<div class="fyp-score ' + tone + '"><div class="fyp-score-top"><span>' + label + '</span><b class="' + cls + '">' +
+      (a ? a.ok + '<small>/' + a.total + '</small>' : '<small>not run</small>') +
+      '</b></div><div class="fyp-bar"><i class="' + cls + '" style="width:' + pct + '%"></i></div></div>'
+    );
+  }
+
+  function intentsHtml() {
+    // Show the most recent healed run, one row per intent.
+    const healed = state.log.filter((r) => r.arm !== 'baseline');
+    const latestRun = healed.reduce((m, r) => Math.max(m, r.run || 0), 0);
+    const last = {};
+    for (const r of healed) if ((r.run || 0) === latestRun) last[r.intent] = r;
+    return INTENTS.map((it, i) => {
+      const r = last[it.id];
+      const live = state.current === it.id;
+      const cls = live ? 'live' : !r ? 'pend' : r.outcome === 'success' ? 'ok' : 'bad';
+      const icon = live ? '<span class="fyp-spin"></span>' : !r ? (i + 1) : r.outcome === 'success' ? '&#10003;' : '&#10005;';
+      const route = r && !live ? '<span class="fyp-grade ' + (GRADE_CLASS[r.grade] || 'gn') + '">' + esc(r.route) + (r.grade && r.grade !== '-' ? ' &middot; ' + esc(r.grade) : '') + '</span>' : '';
+      const ms = r && !live ? '<small>' + fmtMs(r.ms) + '</small>' : '';
+      const fail = r && r.outcome !== 'success' && !live ? '<div class="fyp-why">' + esc(r.detail) + '</div>' : '';
+      const rec = r && r.outcome === 'success' && !live && /recovered/.test(r.detail || '') ? '<div class="fyp-heal">self-healed: ' + esc((r.detail.match(/recovered on [^ ]+ after \d+ failed attempt\(s\)/) || [''])[0]) + '</div>' : '';
+      return (
+        '<li class="fyp-step ' + cls + '"><span class="fyp-ico">' + icon + '</span>' +
+        '<div class="fyp-stepmain"><div class="fyp-steptitle">' + esc(it.desc) + '</div><code>' + esc(it.id) + '</code>' + fail + rec + '</div>' +
+        '<div class="fyp-stepright">' + route + ms + '</div></li>'
+      );
+    }).join('');
+  }
+
+  function chaosHtml() {
+    return Object.keys(BREAKS)
+      .map((k) => {
+        const on = !!state.chaos.active[k];
+        const parts = BREAKS[k].label.split(' · ');
+        return (
+          '<button class="fyp-brk' + (on ? ' on' : '') + '" data-break="' + k + '" aria-pressed="' + on + '">' +
+          '<span class="fyp-brk-id">' + k + '</span><span class="fyp-brk-txt"><b>' + esc(parts[1] || parts[0]) + '</b><small>' + esc(BREAKS[k].note) + '</small></span>' +
+          '<span class="fyp-sw"></span></button>'
+        );
+      })
       .join('');
   }
 
-  function rowsHtml() {
-    const rows = state.log.slice(-70).reverse();
-    if (!rows.length) return '<div class="fyp-muted">No attempts yet. Press Measure, then Run.</div>';
+  function metricsHtml() {
+    const m = (measure = measure || measureAccessibility());
+    const tile = (label, val, sub, tone) => '<div class="fyp-tile ' + (tone || '') + '"><b>' + val + '</b><span>' + label + '</span><small>' + sub + '</small></div>';
     return (
-      '<table class="fyp-log"><thead><tr><th>#</th><th>intent</th><th>route</th><th>grade</th><th>outcome</th><th>ms</th></tr></thead><tbody>' +
+      tile('controls measured', m.total, 'on the current screen') +
+      tile('no accessible name', m.pct + '%', m.unnamed + ' of ' + m.total, m.pct > 30 ? 'bad' : '') +
+      tile('not exposed as button', m.notButtonPct + '%', m.notButton + ' of ' + m.total, m.notButtonPct > 30 ? 'bad' : '') +
+      tile('role="button"', m.unnamedRole, 'elements declared')
+    );
+  }
+
+  function surveyHtml() {
+    const sv = state.survey;
+    if (!sv || !sv.length) return '<div class="fyp-muted">Press <b>Survey all screens</b> to measure the whole flow, not only the screen showing.</div>';
+    const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+    const T = sv.reduce((a, r) => ({ total: a.total + r.total, unnamed: a.unnamed + r.unnamed, notButton: a.notButton + r.notButton }), { total: 0, unnamed: 0, notButton: 0 });
+    const row = (name, r, bold) =>
+      '<tr' + (bold ? ' class="tot"' : '') + '><td>' + name + '</td><td>' + r.total + '</td><td>' + r.unnamed + ' <small>' + pct(r.unnamed, r.total) + '%</small></td><td>' + r.notButton + ' <small>' + pct(r.notButton, r.total) + '%</small></td></tr>';
+    return (
+      '<table class="fyp-tbl"><thead><tr><th>screen</th><th>controls</th><th>no name</th><th>no role</th></tr></thead><tbody>' +
+      sv.map((r) => row(esc(r.screen), r)).join('') +
+      row('all screens', T, true) +
+      '</tbody></table>'
+    );
+  }
+
+  function resultsHtml() {
+    const ex = state.exp;
+    const rows = summarise();
+    const prog = ex.active
+      ? '<div class="fyp-expprog"><div class="fyp-bar"><i style="width:' + Math.round((100 * (ex.rep - 1)) / ex.n) + '%"></i></div><small>round ' + ex.rep + ' of ' + ex.n + ' &middot; ' + ex.label + '</small></div>'
+      : '';
+    if (!rows.length) return prog + '<div class="fyp-muted">No runs yet. Run the flow, or start an N&times; experiment.</div>';
+    return (
+      prog +
+      '<table class="fyp-tbl"><thead><tr><th>config</th><th>arm</th><th>runs</th><th>steps</th><th>flow completed</th></tr></thead><tbody>' +
       rows
-        .map(
-          (r) =>
-            '<tr class="' + (r.outcome === 'success' ? 'ok' : 'bad') + '">' +
-            '<td>' + (r.order == null ? '-' : r.order) + '</td>' +
-            '<td>' + r.intent + '</td>' +
-            '<td>' + r.route + '</td>' +
-            '<td>' + r.grade + '</td>' +
-            '<td title="' + String(r.detail || '').replace(/"/g, '') + '">' + r.outcome + '</td>' +
-            '<td>' + r.ms + '</td></tr>'
-        )
+        .map((a) => {
+          const pct = Math.round((100 * a.full) / a.runs);
+          const cls = pct === 100 ? 'ok' : pct === 0 ? 'bad' : 'warn';
+          return (
+            '<tr><td class="cfg" title="' + esc(a.config) + '">' + esc(a.config) + '</td><td><span class="fyp-arm ' + a.arm + '">' + a.arm + '</span></td><td>' + a.runs +
+            '</td><td>' + (a.steps / a.runs).toFixed(1) + '<small>/' + a.total + '</small></td><td><div class="fyp-pct"><div class="fyp-bar"><i class="' + cls + '" style="width:' + pct + '%"></i></div><b class="' + cls + '">' + pct + '%</b></div></td></tr>'
+          );
+        })
         .join('') +
       '</tbody></table>'
     );
   }
 
-  function render() {
-    if (!panelEl) return;
-    const m = (measure = measure || measureAccessibility());
-    const arms = state.runs;
-    panelEl.querySelector('#fyp-metrics').innerHTML =
-      '<div class="fyp-metric"><span>Controls measured</span><b>' + m.total + '</b></div>' +
-      '<div class="fyp-metric"><span>No accessible name</span><b class="bad">' + m.unnamed + ' (' + m.pct + '%)</b></div>' +
-      '<div class="fyp-metric"><span>Not exposed as a button</span><b class="bad">' + m.notButton + ' (' + m.notButtonPct + '%)</b></div>' +
-      '<div class="fyp-metric"><span>role="button" elements</span><b class="bad">' + m.unnamedRole + '</b></div>' +
-      '<div class="fyp-metric"><span>Baseline (hard-coded)</span><b>' + (arms.baseline ? arms.baseline.ok + '/' + arms.baseline.total + ' steps' : 'not run') + '</b></div>' +
-      '<div class="fyp-metric"><span>Healed (this harness)</span><b class="' + (arms.healed && arms.healed.ok === arms.healed.total ? 'ok' : '') + '">' + (arms.healed ? arms.healed.ok + '/' + arms.healed.total + ' steps' : 'not run') + '</b></div>' +
-      '<div class="fyp-metric"><span>Routes used</span><div>' + (routeChips() || '<span class="fyp-muted">-</span>') + '</div></div>';
-
-    panelEl.querySelector('#fyp-survey').innerHTML = surveyHtml();
-    panelEl.querySelector('#fyp-results').innerHTML = resultsHtml();
-
-    panelEl.querySelector('#fyp-intents').innerHTML = INTENTS.map((it) => {
-      const done = state.log.filter((r) => r.intent === it.id).slice(-1)[0];
-      const cls = !done ? 'pend' : done.outcome === 'success' ? 'ok' : 'bad';
-      return '<div class="fyp-intent ' + cls + '"><span>' + it.id + '</span><em>' + (done ? done.route + ' · ' + done.outcome : '—') + '</em></div>';
-    }).join('');
-
-    panelEl.querySelector('#fyp-log').innerHTML = rowsHtml();
-
-    panelEl.querySelector('#fyp-chaos').innerHTML = Object.keys(BREAKS)
-      .map((k) => {
-        const on = state.chaos.active[k];
-        return '<button class="fyp-break' + (on ? ' on' : '') + '" data-break="' + k + '" title="' + BREAKS[k].note + '">' + BREAKS[k].label + '</button>';
+  function logHtml() {
+    let rows = state.log.map((r, i) => ({ r, i }));
+    if (prefs.failOnly) rows = rows.filter((x) => x.r.outcome !== 'success');
+    rows = rows.slice(-80).reverse();
+    if (!rows.length) return '<div class="fyp-muted">' + (prefs.failOnly ? 'No failures logged.' : 'No attempts yet. Run the flow to fill this in.') + '</div>';
+    return rows
+      .map(({ r, i }) => {
+        const ok = r.outcome === 'success';
+        const open = openRows.has(i);
+        const arm = r.arm || 'healed';
+        return (
+          '<div class="fyp-lrow ' + (ok ? 'ok' : 'bad') + (open ? ' open' : '') + '" data-row="' + i + '">' +
+          '<div class="fyp-lhead"><i class="fyp-ldot"></i><span class="fyp-lint">' + esc(r.intent) + '</span>' +
+          '<span class="fyp-arm ' + arm + '">' + arm + '</span><span class="fyp-lroute">' + esc(r.route) + '</span><small>' + fmtMs(r.ms) + '</small></div>' +
+          (open
+            ? '<div class="fyp-ldet"><div>' + esc(r.detail) + '</div><div class="fyp-lmeta">' +
+              [r.timestamp, 'config: ' + (r.config || 'clean'), 'run ' + r.run + (r.rep ? ' / rep ' + r.rep : ''), 'outcome: ' + r.outcome, diagnosis(r) ? 'diagnosis: ' + diagnosis(r) : ''].filter(Boolean).map(esc).join(' &middot; ') +
+              '</div></div>'
+            : '') +
+          '</div>'
+        );
       })
-      .join('') + '<button class="fyp-break reset" data-break="__clear">Reset all breaks</button>';
+      .join('');
+  }
 
-    const fatal = panelEl.querySelector('#fyp-fatal');
-    if (state.lastFatal) {
-      fatal.style.display = 'block';
-      fatal.innerHTML =
-        '<b>The assistant, reporting honestly:</b><br>"' + state.lastFatal + '"' +
-        (state.lastShot
-          ? '<div style="margin-top:8px;font-size:10px;color:#fca5a5">What I was looking at:</div>' +
-            '<img alt="screenshot of the screen when the harness gave up" src="' + state.lastShot +
-            '" style="width:100%;margin-top:4px;border:1px solid #5c2b2b;border-radius:6px">'
-          : '');
-    } else {
-      fatal.style.display = 'none';
+  // ---------------------------------------------------------------------------
+  // Painting. render() only schedules; paint() does the work once per frame.
+  // ---------------------------------------------------------------------------
+  let paintQueued = 0;
+  function render() {
+    if (!panelEl || paintQueued) return;
+    paintQueued = requestAnimationFrame(() => { paintQueued = 0; paint(); });
+  }
+
+  function paint() {
+    if (!panelEl) return;
+    const $ = (id) => panelEl.querySelector('#' + id);
+    const busy = running || state.exp.active;
+    if (busy && !state.busySince) state.busySince = now();
+    if (!busy) state.busySince = 0;
+
+    panelEl.classList.toggle('min', !!prefs.min);
+    panelEl.classList.toggle('left', prefs.dock === 'left');
+    panelEl.dataset.busy = busy ? '1' : '';
+
+    // Status bar
+    let kind = 'idle';
+    let title = 'Ready';
+    let sub = 'Pick some breaks, then run the flow.';
+    const h = state.runs.healed;
+    if (busy) {
+      kind = 'run';
+      title = state.exp.active ? 'Experiment &middot; round ' + state.exp.rep + ' of ' + state.exp.n : 'Running';
+      sub = esc(state.prog || 'working...');
+    } else if (state.lastFatal) {
+      kind = 'bad';
+      title = 'Stopped honestly';
+      sub = 'A step could not be done - the reason is on the Run tab.';
+    } else if (h) {
+      kind = h.ok === h.total ? 'ok' : 'warn';
+      title = h.ok === h.total ? 'Flow completed' : 'Finished with misses';
+      sub = h.ok + ' of ' + h.total + ' steps succeeded' + (h.stopped ? ' (stopped early)' : '');
+    }
+    $('fyp-hdot').className = 'fyp-dot fyp-hdot ' + kind;
+    $('fyp-exp-stop2').style.display = state.exp.active ? '' : 'none';
+    $('fyp-status').className = 'fyp-status ' + kind;
+    $('fyp-status').innerHTML =
+      '<i class="fyp-dot ' + kind + '"></i><div class="fyp-stat-main"><b>' + title + '</b><span>' + sub + '</span></div>' +
+      '<time>' + (busy ? fmtClock(now() - state.busySince) : '') + '</time>';
+
+    // Tabs
+    const armed = Object.keys(state.chaos.active).length;
+    panelEl.querySelectorAll('[data-tab]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.tab === prefs.tab);
+      if (b.dataset.tab === 'break') b.innerHTML = 'Break' + (armed ? '<em>' + armed + '</em>' : '');
+    });
+    panelEl.querySelectorAll('[data-pane]').forEach((p) => { p.hidden = p.dataset.pane !== prefs.tab; });
+
+    // Busy gating
+    panelEl.querySelectorAll('[data-needs-idle]').forEach((b) => { b.disabled = busy; });
+    $('fyp-stop').style.display = busy ? '' : 'none';
+    $('fyp-run').style.display = busy ? 'none' : '';
+
+    // Only the visible pane is repainted: cheaper, and it keeps scroll position
+    // and the N input focused on the others.
+    switch (prefs.tab) {
+      case 'run':
+        $('fyp-scores').innerHTML = scoreCard('Healed', state.runs.healed, 'healed') + scoreCard('Baseline', state.runs.baseline, 'baseline');
+        $('fyp-intents').innerHTML = intentsHtml();
+        $('fyp-routes').innerHTML = routeUsage();
+        {
+          const fatal = $('fyp-fatal');
+          if (state.lastFatal) {
+            fatal.style.display = 'block';
+            fatal.innerHTML =
+              '<div class="fyp-fatal-h">The assistant, reporting honestly</div><p>&ldquo;' + esc(state.lastFatal) + '&rdquo;</p>' +
+              (state.lastShot ? '<div class="fyp-fatal-s">What I was looking at</div><img alt="screenshot of the screen when the harness gave up" src="' + state.lastShot + '">' : '');
+          } else fatal.style.display = 'none';
+        }
+        break;
+      case 'break':
+        $('fyp-chaos').innerHTML = chaosHtml();
+        break;
+      case 'results':
+        $('fyp-results').innerHTML = resultsHtml();
+        break;
+      case 'log':
+        $('fyp-log').innerHTML = logHtml();
+        $('fyp-filter').classList.toggle('on', !!prefs.failOnly);
+        $('fyp-logcount').textContent = state.log.length + ' attempts';
+        break;
+      case 'a11y':
+        $('fyp-metrics').innerHTML = metricsHtml();
+        $('fyp-survey').innerHTML = surveyHtml();
+        break;
     }
   }
 
-  function panel() {
-    if (panelEl) return panelEl;
-    const css = document.createElement('style');
-    css.textContent = `
-#${PANEL_ID}{position:fixed;top:8px;right:8px;width:392px;max-height:94vh;overflow:auto;z-index:100000;
- background:#0b0b0d;color:#e8e8ea;border:1px solid #2c2c31;border-radius:10px;
- font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;box-shadow:0 8px 40px rgba(0,0,0,.6)}
-#${PANEL_ID} h1{margin:0;padding:9px 11px;font-size:12px;letter-spacing:.02em;background:#141418;
- border-bottom:1px solid #2c2c31;border-radius:9px 9px 0 0;display:flex;justify-content:space-between;align-items:center}
-#${PANEL_ID} h1 small{color:#8a8a93;font-weight:400}
-#${PANEL_ID} .fyp-sec{padding:9px 11px;border-bottom:1px solid #1e1e23}
-#${PANEL_ID} .fyp-sec>h2{margin:0 0 7px;font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#8a8a93;font-weight:600}
-#${PANEL_ID} button{font:inherit;background:#1b1b20;color:#e8e8ea;border:1px solid #33333a;border-radius:6px;
- padding:6px 9px;cursor:pointer}
-#${PANEL_ID} button:hover{background:#24242b}
-#${PANEL_ID} button.pri{background:#2563eb;border-color:#2563eb;color:#fff}
-#${PANEL_ID} button.warn{background:#3a1d1d;border-color:#5c2b2b}
-#${PANEL_ID} .fyp-row{display:flex;gap:6px;flex-wrap:wrap}
-#${PANEL_ID} .fyp-metric{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
-#${PANEL_ID} .fyp-metric span{color:#a0a0a8}
-#${PANEL_ID} b.ok{color:#4ade80}#${PANEL_ID} b.bad{color:#f87171}
-#${PANEL_ID} .fyp-intent{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
-#${PANEL_ID} .fyp-intent em{color:#8a8a93;font-style:normal}
-#${PANEL_ID} .fyp-intent.ok span{color:#4ade80}#${PANEL_ID} .fyp-intent.bad span{color:#f87171}
-#${PANEL_ID} .fyp-intent.pend span{color:#8a8a93}
-#${PANEL_ID} .fyp-break{width:calc(50% - 3px);text-align:left;font-size:11px}
-#${PANEL_ID} .fyp-break.on{background:#7f1d1d;border-color:#b91c1c;color:#fff}
-#${PANEL_ID} .fyp-break.reset{width:100%}
-#${PANEL_ID} table.fyp-log{width:100%;border-collapse:collapse;font-size:10.5px}
-#${PANEL_ID} table.fyp-log th{text-align:left;color:#8a8a93;font-weight:600;border-bottom:1px solid #2c2c31;padding:3px 3px}
-#${PANEL_ID} table.fyp-log td{padding:3px 3px;border-bottom:1px solid #17171b;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#${PANEL_ID} tr.ok td:nth-child(5){color:#4ade80}#${PANEL_ID} tr.bad td:nth-child(5){color:#f87171}
-#${PANEL_ID} .fyp-chip{display:inline-block;background:#1b1b20;border:1px solid #33333a;border-radius:99px;
- padding:1px 7px;margin:1px 3px 1px 0;font-size:10px}
-#${PANEL_ID} .fyp-muted{color:#8a8a93}
-#${PANEL_ID} #fyp-fatal{display:none;margin:0;padding:10px 11px;background:#2a1010;border-left:3px solid #ef4444;color:#fecaca}
+  // ---------------------------------------------------------------------------
+  // Results export
+  // ---------------------------------------------------------------------------
+  function resultsJson() {
+    return JSON.stringify({ exported: new Date().toISOString(), summary: summarise(), intents: INTENTS.map((i) => ({ id: i.id, desc: i.desc })), log: state.log.map((r) => Object.assign({ diagnosis: diagnosis(r) }, r)) }, null, 2);
+  }
+
+  const STYLE = `
+@P{position:fixed;top:10px;right:10px;width:404px;max-width:calc(100vw - 20px);max-height:calc(100vh - 20px);display:flex;flex-direction:column;
+ z-index:100000;background:#0e0f13;color:#e7e9ee;border:1px solid #23262d;border-radius:14px;overflow:hidden;
+ font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 18px 60px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.02) inset;
+ --bg:#0e0f13;--s1:#15171c;--s2:#1b1e25;--bd:#23262d;--bd2:#2d313b;--tx:#e7e9ee;--mu:#8b90a0;--ac:#6d8bff;--ok:#3ddc97;--bad:#ff6b6b;--warn:#ffb454;
+ --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@P.left{right:auto;left:10px}
+@P *{box-sizing:border-box}
+@P button{font:inherit;color:inherit;background:var(--s2);border:1px solid var(--bd2);border-radius:8px;padding:7px 11px;cursor:pointer;transition:background .12s,border-color .12s,transform .06s}
+@P button:hover:not(:disabled){background:#242832;border-color:#3a3f4b}
+@P button:active:not(:disabled){transform:translateY(1px)}
+@P button:disabled{opacity:.45;cursor:not-allowed}
+@P button:focus-visible,@P input:focus-visible,@P select:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+@P button.pri{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+@P button.pri:hover:not(:disabled){background:#7f9bff}
+@P button.danger{background:#3a1c1f;border-color:#6a2a2f;color:#ffc4c4;font-weight:600}
+@P button.ghost{background:transparent}
+@P small{color:var(--mu);font-size:11px}
+@P code,@P .cfg,@P time{font-family:var(--mono)}
+@P .fyp-muted{color:var(--mu);font-size:12px;padding:4px 0}
+@P .fyp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 10px 10px 12px;background:var(--s1);border-bottom:1px solid var(--bd);cursor:grab;user-select:none;touch-action:none}
+@P .fyp-head:active{cursor:grabbing}
+@P .fyp-brand{display:flex;align-items:center;gap:9px;min-width:0}
+@P .fyp-brand b{display:block;font-size:13px;letter-spacing:.01em}
+@P .fyp-brand small{display:block;margin-top:-1px}
+@P .fyp-logo{width:26px;height:26px;border-radius:8px;background:conic-gradient(from 210deg,#6d8bff,#3ddc97,#ffb454,#6d8bff);position:relative;flex:none}
+@P .fyp-logo:after{content:"";position:absolute;inset:6px;border-radius:4px;background:var(--s1)}
+@P .fyp-hbtns{display:flex;align-items:center;gap:5px}
+@P .fyp-hbtns button{padding:3px 8px;line-height:1.3;background:transparent;border-color:transparent;color:var(--mu)}
+@P .fyp-hbtns button:hover:not(:disabled){color:var(--tx)}
+@P .fyp-dot{width:9px;height:9px;border-radius:50%;background:#555b6a;flex:none;display:inline-block}
+@P .fyp-dot.run{background:var(--ac);box-shadow:0 0 0 0 rgba(109,139,255,.6);animation:fypPulse 1.3s infinite}
+@P .fyp-dot.ok{background:var(--ok)}@P .fyp-dot.bad{background:var(--bad)}@P .fyp-dot.warn{background:var(--warn)}
+@keyframes fypPulse{70%{box-shadow:0 0 0 8px rgba(109,139,255,0)}100%{box-shadow:0 0 0 0 rgba(109,139,255,0)}}
+@P .fyp-status{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border-bottom:1px solid var(--bd)}
+@P .fyp-status.run{background:linear-gradient(90deg,rgba(109,139,255,.10),transparent)}
+@P .fyp-status.bad{background:linear-gradient(90deg,rgba(255,107,107,.10),transparent)}
+@P .fyp-status.ok{background:linear-gradient(90deg,rgba(61,220,151,.09),transparent)}
+@P .fyp-stat-main{flex:1;min-width:0}
+@P .fyp-stat-main b{display:block;font-size:12.5px}
+@P .fyp-stat-main span{display:block;color:var(--mu);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@P time{color:var(--mu);font-size:11.5px}
+@P .fyp-tabs{display:flex;gap:2px;padding:6px 8px 0;background:var(--bg);border-bottom:1px solid var(--bd)}
+@P .fyp-tabs button{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;border-radius:6px 6px 0 0;color:var(--mu);padding:7px 4px;font-size:12px;font-weight:500}
+@P .fyp-tabs button:hover:not(:disabled){background:var(--s1);color:var(--tx)}
+@P .fyp-tabs button.on{color:var(--tx);border-bottom-color:var(--ac);background:var(--s1)}
+@P .fyp-tabs em{font-style:normal;background:var(--bad);color:#fff;font-size:10px;border-radius:9px;padding:0 5px;margin-left:4px;font-weight:700}
+@P .fyp-body{overflow:auto;flex:1;min-height:0;scrollbar-width:thin;scrollbar-color:#2d313b transparent}
+@P section{padding:12px}
+@P section[hidden]{display:none}
+@P h3{margin:14px 0 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--mu);font-weight:600}
+@P h3:first-child{margin-top:0}
+@P .fyp-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+@P .fyp-actions button.pri{flex:1 1 100%;padding:10px;font-size:13.5px}
+@P .fyp-actions button.danger{flex:1 1 100%;padding:10px;font-size:13.5px}
+@P .fyp-actions button:not(.pri):not(.danger){flex:1}
+@P .fyp-scores{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+@P .fyp-score{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:9px 11px}
+@P .fyp-score-top{display:flex;justify-content:space-between;align-items:baseline}
+@P .fyp-score-top span{color:var(--mu);font-size:11.5px}
+@P .fyp-score-top b{font-size:20px;line-height:1.1}
+@P .fyp-score-top b small{font-size:12px;font-weight:500}
+@P b.ok,@P .ok>b{color:var(--ok)}@P b.bad{color:var(--bad)}@P b.warn{color:var(--warn)}
+@P .fyp-bar{height:5px;background:var(--s2);border-radius:9px;overflow:hidden;margin-top:7px;flex:1}
+@P .fyp-bar i{display:block;height:100%;border-radius:9px;background:var(--ac);transition:width .35s}
+@P .fyp-bar i.ok{background:var(--ok)}@P .fyp-bar i.bad{background:var(--bad)}@P .fyp-bar i.warn{background:var(--warn)}
+@P ol.fyp-steps{list-style:none;margin:0;padding:0;position:relative}
+@P .fyp-step{display:flex;gap:10px;padding:7px 0;align-items:flex-start;position:relative}
+@P .fyp-step:not(:last-child):before{content:"";position:absolute;left:10px;top:30px;bottom:-6px;width:1px;background:var(--bd)}
+@P .fyp-ico{width:21px;height:21px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--s2);color:var(--mu);border:1px solid var(--bd2)}
+@P .fyp-step.ok .fyp-ico{background:rgba(61,220,151,.14);border-color:rgba(61,220,151,.5);color:var(--ok)}
+@P .fyp-step.bad .fyp-ico{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.5);color:var(--bad)}
+@P .fyp-step.live .fyp-ico{border-color:var(--ac)}
+@P .fyp-spin{width:11px;height:11px;border-radius:50%;border:2px solid rgba(109,139,255,.3);border-top-color:var(--ac);animation:fypSpin .7s linear infinite}
+@keyframes fypSpin{to{transform:rotate(360deg)}}
+@P .fyp-stepmain{flex:1;min-width:0}
+@P .fyp-steptitle{font-size:12.5px;line-height:1.3}
+@P .fyp-step.pend .fyp-steptitle{color:var(--mu)}
+@P .fyp-stepmain code{font-size:10.5px;color:var(--mu)}
+@P .fyp-stepright{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none;max-width:42%}
+@P .fyp-why{margin-top:4px;font-size:11px;color:#ffb4b4;background:rgba(255,107,107,.08);border-radius:6px;padding:4px 7px;word-break:break-word}
+@P .fyp-heal{margin-top:4px;font-size:11px;color:#8fe9bd}
+@P .fyp-grade{font-family:var(--mono);font-size:10.5px;padding:1px 7px;border-radius:9px;background:var(--s2);border:1px solid var(--bd2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+@P .fyp-grade.ga{color:var(--ok);border-color:rgba(61,220,151,.4)}@P .fyp-grade.gab{color:#5eead4;border-color:rgba(94,234,212,.4)}
+@P .fyp-grade.gb{color:var(--warn);border-color:rgba(255,180,84,.4)}@P .fyp-grade.gd{color:#ff9d6b;border-color:rgba(255,157,107,.4)}
+@P .fyp-grade.gf{color:var(--bad);border-color:rgba(255,107,107,.4)}
+@P .fyp-usage{display:flex;height:8px;border-radius:9px;overflow:hidden;gap:2px}
+@P .fyp-use{min-width:4px}
+@P .r-id{background:#6d8bff}@P .r-label{background:#3ddc97}@P .r-text{background:#ffb454}@P .r-scoped{background:#5eead4}@P .r-vision{background:#ff9d6b}@P .r-none{background:#ff6b6b}@P .r-precondition,@P .r-predicate{background:#6b7080}
+@P .fyp-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--mu)}
+@P .fyp-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+@P #fyp-fatal{display:none;margin-top:12px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.45);border-radius:10px;padding:10px 12px}
+@P .fyp-fatal-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#ff9b9b;font-weight:700}
+@P #fyp-fatal p{margin:5px 0 0;color:#ffd6d6;font-size:12.5px;line-height:1.5}
+@P .fyp-fatal-s{margin-top:9px;font-size:10.5px;color:#ff9b9b}
+@P #fyp-fatal img{width:100%;margin-top:4px;border:1px solid #5c2b2b;border-radius:8px}
+@P .fyp-brk{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;margin-bottom:6px;border-radius:10px;background:var(--s1)}
+@P .fyp-brk.on{border-color:rgba(255,107,107,.55);background:linear-gradient(90deg,rgba(255,107,107,.10),var(--s1))}
+@P .fyp-brk-id{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--mu);width:24px;flex:none}
+@P .fyp-brk.on .fyp-brk-id{color:var(--bad)}
+@P .fyp-brk-txt{flex:1;min-width:0}
+@P .fyp-brk-txt b{display:block;font-size:12.5px;font-weight:600}
+@P .fyp-brk-txt small{display:block;line-height:1.35;margin-top:1px}
+@P .fyp-sw{width:30px;height:17px;border-radius:9px;background:#333844;position:relative;flex:none;transition:background .15s}
+@P .fyp-sw:after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform .15s}
+@P .fyp-brk.on .fyp-sw{background:var(--bad)}@P .fyp-brk.on .fyp-sw:after{transform:translateX(13px)}
+@P .fyp-chips button{font-size:11.5px;padding:4px 10px;border-radius:99px}
+@P input,@P select{font:inherit;background:var(--s2);color:var(--tx);border:1px solid var(--bd2);border-radius:8px;padding:6px 8px}
+@P input[type=number]{width:58px}
+@P .fyp-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+@P .fyp-tbl th{text-align:left;color:var(--mu);font-weight:600;font-size:10.5px;padding:4px 5px;border-bottom:1px solid var(--bd2)}
+@P .fyp-tbl td{padding:6px 5px;border-bottom:1px solid var(--bd);vertical-align:middle}
+@P .fyp-tbl .cfg{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px}
+@P .fyp-tbl tr.tot td{font-weight:700;border-bottom:0}
+@P .fyp-pct{display:flex;align-items:center;gap:6px;min-width:84px}@P .fyp-pct .fyp-bar{margin:0}@P .fyp-pct b{font-size:11px;width:32px;text-align:right}
+@P .fyp-arm{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;border-radius:5px;background:var(--s2);color:var(--mu)}
+@P .fyp-arm.healed{color:var(--ok);background:rgba(61,220,151,.1)}@P .fyp-arm.baseline{color:var(--warn);background:rgba(255,180,84,.1)}
+@P .fyp-expprog{margin-bottom:10px}@P .fyp-expprog .fyp-bar{margin:0 0 4px}
+@P .fyp-lrow{border:1px solid var(--bd);border-radius:9px;margin-bottom:5px;background:var(--s1);cursor:pointer;overflow:hidden}
+@P .fyp-lrow:hover{border-color:var(--bd2)}
+@P .fyp-lhead{display:flex;align-items:center;gap:7px;padding:6px 9px}
+@P .fyp-ldot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+@P .fyp-lrow.bad .fyp-ldot{background:var(--bad)}
+@P .fyp-lint{font-family:var(--mono);font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@P .fyp-lroute{font-family:var(--mono);font-size:10.5px;color:var(--mu);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@P .fyp-ldet{padding:6px 10px 9px;border-top:1px solid var(--bd);font-size:11.5px;color:#c8ccd6;word-break:break-word}
+@P .fyp-lrow.bad .fyp-ldet>div:first-child{color:#ffb4b4}
+@P .fyp-lmeta{margin-top:5px;color:var(--mu);font-size:10.5px;font-family:var(--mono)}
+@P .fyp-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@P .fyp-tile{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:9px 11px}
+@P .fyp-tile b{display:block;font-size:22px;line-height:1.1}
+@P .fyp-tile.bad b{color:var(--bad)}
+@P .fyp-tile span{display:block;font-size:11.5px;color:var(--tx)}
+@P .fyp-tile small{display:block}
+@P.min{width:236px}
+@P.min .fyp-status,@P.min .fyp-tabs,@P.min .fyp-body,@P.min .fyp-brand small{display:none}
+@P.min .fyp-head{border-bottom:0}
+@P .fyp-hdot{display:none}
+@P.min .fyp-hdot{display:inline-block}
+@media (prefers-reduced-motion:reduce){@P *{animation:none!important;transition:none!important}}
 `;
+
+  function panel() {
+    if (panelEl) {
+      panelEl.style.display = '';
+      prefs.min = false;
+      render();
+      return panelEl;
+    }
+    const css = document.createElement('style');
+    css.setAttribute('data-fyp-style', '1');
+    css.textContent = STYLE.split('@P').join('#' + PANEL_ID);
     document.head.appendChild(css);
 
     panelEl = document.createElement('div');
     panelEl.id = PANEL_ID;
+    panelEl.setAttribute('role', 'region');
+    panelEl.setAttribute('aria-label', 'FYP harness');
     panelEl.innerHTML = `
-<h1>FYP harness · intent-aware self-healing<small id="fyp-close" style="cursor:pointer">hide</small></h1>
-<div class="fyp-sec">
-  <h2>1 · Accessibility surface</h2>
-  <div id="fyp-metrics"></div>
-  <div id="fyp-survey"></div>
-</div>
-<div class="fyp-sec">
-  <h2>2 · Intents (goals, not coordinates)</h2>
-  <div id="fyp-intents"></div>
-</div>
-<div class="fyp-sec">
-  <h2>3 · Run</h2>
-  <div class="fyp-row">
-    <button class="pri" id="fyp-run">Run all (healed)</button>
-    <button id="fyp-step">Step</button>
-    <button id="fyp-baseline">Run baseline</button>
-    <button id="fyp-reset">Reset app</button>
-    <button id="fyp-measure">Re-measure</button>
+<div class="fyp-head" id="fyp-drag">
+  <div class="fyp-brand"><i class="fyp-logo"></i><div><b>FYP Harness</b><small>intent-aware self-healing</small></div><i class="fyp-dot fyp-hdot" id="fyp-hdot"></i></div>
+  <div class="fyp-hbtns">
+    <button data-act="dock" title="Dock to the other side" aria-label="Dock to the other side">&#8644;</button>
+    <button data-act="min" title="Minimise (Alt+H)" aria-label="Minimise">&#8211;</button>
+    <button data-act="hide" title="Hide" aria-label="Hide panel">&#10005;</button>
   </div>
 </div>
-<div class="fyp-sec">
-  <h2>4 · Break the UI</h2>
-  <div class="fyp-row" id="fyp-chaos"></div>
-</div>
-<div class="fyp-sec">
-  <h2>5 · Results</h2>
-  <div class="fyp-row" style="margin-bottom:7px;align-items:center">
-    <button class="pri" id="fyp-exp-run">Run N&times;</button>
-    <input id="fyp-exp-n" type="number" min="1" max="50" value="5" style="width:48px;background:#1b1b20;color:#e8e8ea;border:1px solid #33333a;border-radius:6px;padding:5px">
-    <select id="fyp-exp-set" style="background:#1b1b20;color:#e8e8ea;border:1px solid #33333a;border-radius:6px;padding:5px">
-      <option value="demo">demo set (6 configs)</option>
-      <option value="full">full set (12 configs)</option>
-    </select>
-    <button id="fyp-exp-stop">Stop</button>
-  </div>
-  <div id="fyp-results"></div>
-  <div class="fyp-row" style="margin-top:7px">
-    <button id="fyp-dl-sum">Summary CSV</button>
-    <button id="fyp-dl-log">Attempt log CSV</button>
-    <button id="fyp-clear-log">Clear log</button>
-  </div>
-</div>
-<div class="fyp-sec">
-  <h2>6 · Attempt log</h2>
-  <div id="fyp-log"></div>
-</div>
-<div id="fyp-fatal"></div>`;
+<div class="fyp-status" id="fyp-status"></div>
+<nav class="fyp-tabs" id="fyp-tabs">
+  <button data-tab="run">Run</button><button data-tab="break">Break</button><button data-tab="results">Results</button><button data-tab="log">Log</button><button data-tab="a11y">A11y</button>
+</nav>
+<div class="fyp-body">
+  <section data-pane="run">
+    <div class="fyp-row fyp-actions">
+      <button class="pri" id="fyp-run" data-needs-idle>&#9654;&nbsp; Run healed flow</button>
+      <button class="danger" id="fyp-stop" style="display:none">&#9632;&nbsp; Stop</button>
+      <button id="fyp-step" data-needs-idle title="Run only the next unfinished intent">Step</button>
+      <button id="fyp-baseline" data-needs-idle title="Replay the hard-coded recording">Baseline</button>
+      <button id="fyp-reset" data-needs-idle title="Clear breaks and go back to the feed">Reset app</button>
+    </div>
+    <div class="fyp-scores" id="fyp-scores"></div>
+    <div id="fyp-fatal"></div>
+    <h3>Intents &middot; goals, not coordinates</h3>
+    <ol class="fyp-steps" id="fyp-intents"></ol>
+    <h3>Routes used</h3>
+    <div id="fyp-routes"></div>
+  </section>
+  <section data-pane="break" hidden>
+    <h3>Presets</h3>
+    <div class="fyp-row fyp-chips" style="margin-bottom:6px">
+      <button data-preset="rot" data-needs-idle>Locator rot</button>
+      <button data-preset="messy" data-needs-idle>Messy layout</button>
+      <button data-preset="hostile" data-needs-idle>Everything B1&ndash;B7</button>
+      <button data-preset="honest" data-needs-idle>Honest failure</button>
+      <button data-preset="none" data-needs-idle class="ghost">Clear all</button>
+    </div>
+    <h3>Break the UI</h3>
+    <div id="fyp-chaos"></div>
+    <div class="fyp-muted">Breaks re-apply to every screen the flow visits. Healed and baseline both run against the same broken UI.</div>
+  </section>
+  <section data-pane="results" hidden>
+    <h3>N-times experiment</h3>
+    <div class="fyp-row" style="margin-bottom:12px">
+      <button class="pri" id="fyp-exp-run" data-needs-idle>Run N&times;</button>
+      <input id="fyp-exp-n" type="number" min="1" max="50" value="5" aria-label="repetitions">
+      <select id="fyp-exp-set" aria-label="configuration set" style="flex:1;min-width:0">
+        <option value="demo">demo set (6 configs)</option>
+        <option value="full">full set (12 configs)</option>
+      </select>
+      <button id="fyp-exp-stop2" class="danger" style="display:none">Stop</button>
+    </div>
+    <h3>Summary</h3>
+    <div id="fyp-results"></div>
+    <h3>Export</h3>
+    <div class="fyp-row">
+      <button id="fyp-dl-sum">Summary CSV</button>
+      <button id="fyp-dl-log">Attempt log CSV</button>
+      <button id="fyp-dl-json">All as JSON</button>
+    </div>
+  </section>
+  <section data-pane="log" hidden>
+    <div class="fyp-row" style="justify-content:space-between;margin-bottom:8px">
+      <small id="fyp-logcount"></small>
+      <div class="fyp-row">
+        <button id="fyp-filter" class="ghost" style="padding:3px 10px;font-size:11.5px">Failures only</button>
+        <button id="fyp-clear-log" class="ghost" style="padding:3px 10px;font-size:11.5px">Clear</button>
+      </div>
+    </div>
+    <div id="fyp-log"></div>
+  </section>
+  <section data-pane="a11y" hidden>
+    <h3>Current screen</h3>
+    <div class="fyp-tiles" id="fyp-metrics"></div>
+    <h3>Whole flow</h3>
+    <div id="fyp-survey"></div>
+    <div class="fyp-row" style="margin-top:10px">
+      <button id="fyp-survey-run" data-needs-idle class="pri">Survey all screens</button>
+      <button id="fyp-measure" data-needs-idle>Re-measure</button>
+    </div>
+    <div class="fyp-muted" style="margin-top:8px">A control with no name is invisible to a screen reader as well as to this harness - same measurement, two meanings.</div>
+  </section>
+</div>`;
     document.body.appendChild(panelEl);
 
-    panelEl.querySelector('#fyp-run').onclick = () => runHealed().then(render);
-    panelEl.querySelector('#fyp-step').onclick = () => stepOnce().then(render);
-    panelEl.querySelector('#fyp-baseline').onclick = () => runBaseline().then(render);
-    panelEl.querySelector('#fyp-reset').onclick = () => resetApp().then(render);
-    panelEl.querySelector('#fyp-measure').onclick = () => surveyScreens();
-    panelEl.querySelector('#fyp-exp-run').onclick = () => {
-      const n = Math.max(1, Math.min(50, parseInt(panelEl.querySelector('#fyp-exp-n').value, 10) || 1));
-      runExperiment(n, panelEl.querySelector('#fyp-exp-set').value);
+    const $ = (id) => panelEl.querySelector('#' + id);
+    const stop = () => {
+      state.stop = true;
+      state.exp.stop = true;
+      flash('Stopping after the current step.');
+      render();
     };
-    panelEl.querySelector('#fyp-exp-stop').onclick = () => { state.exp.stop = true; flash('Stopping after the current configuration.'); };
-    panelEl.querySelector('#fyp-dl-sum').onclick = () => download('fyp-summary.csv', summaryCsv());
-    panelEl.querySelector('#fyp-dl-log').onclick = () => download('fyp-attempt-log.csv', logCsv());
-    panelEl.querySelector('#fyp-clear-log').onclick = () => { state.log.length = 0; state.runs = { healed: null, baseline: null }; render(); };
-    panelEl.querySelector('#fyp-close').onclick = () => { panelEl.style.display = 'none'; };
-    panelEl.querySelector('#fyp-chaos').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-break]');
+
+    $('fyp-run').onclick = () => runHealed().then(render);
+    $('fyp-step').onclick = () => stepOnce().then(render);
+    $('fyp-baseline').onclick = () => runBaseline().then(render);
+    $('fyp-reset').onclick = () => resetApp().then(render);
+    $('fyp-stop').onclick = stop;
+    $('fyp-exp-stop2').onclick = stop;
+    $('fyp-measure').onclick = () => { measure = measureAccessibility(); render(); };
+    $('fyp-survey-run').onclick = () => surveyScreens();
+    $('fyp-exp-run').onclick = () => {
+      const n = Math.max(1, Math.min(50, parseInt($('fyp-exp-n').value, 10) || 1));
+      runExperiment(n, $('fyp-exp-set').value);
+    };
+    $('fyp-dl-sum').onclick = () => download('fyp-summary.csv', summaryCsv());
+    $('fyp-dl-log').onclick = () => download('fyp-attempt-log.csv', logCsv());
+    $('fyp-dl-json').onclick = () => download('fyp-results.json', resultsJson(), 'application/json');
+    $('fyp-filter').onclick = () => { prefs.failOnly = !prefs.failOnly; savePrefs(); render(); };
+    $('fyp-clear-log').onclick = () => {
+      state.log.length = 0;
+      state.runs = { healed: null, baseline: null };
+      openRows.clear();
+      saveLogSoon();
+      render();
+    };
+
+    $('fyp-tabs').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-tab]');
       if (!b) return;
-      if (b.dataset.break === '__clear') clearChaos();
-      else applyBreak(b.dataset.break);
+      prefs.tab = b.dataset.tab;
+      savePrefs();
+      if (prefs.tab === 'a11y') measure = measureAccessibility();
+      render();
     });
+    $('fyp-chaos').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-break]');
+      if (!b || running) return;
+      if (state.chaos.active[b.dataset.break]) {
+        // Toggle off: restore the app, then re-arm what stays on.
+        const keep = Object.keys(state.chaos.active).filter((k) => k !== b.dataset.break);
+        clearChaos();
+        keep.forEach((k) => applyBreak(k));
+      } else applyBreak(b.dataset.break);
+      render();
+    });
+    const PRESET_BREAKS = { rot: ['B1', 'B2'], messy: ['B3', 'B4', 'B5'], hostile: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'], honest: ['B8'], none: [] };
+    panelEl.addEventListener('click', (e) => {
+      const p = e.target.closest('[data-preset]');
+      if (!p || running) return;
+      clearChaos();
+      PRESET_BREAKS[p.dataset.preset].forEach((k) => applyBreak(k));
+      render();
+    });
+    $('fyp-log').addEventListener('click', (e) => {
+      const row = e.target.closest('[data-row]');
+      if (!row) return;
+      const i = +row.dataset.row;
+      if (openRows.has(i)) openRows.delete(i); else openRows.add(i);
+      render();
+    });
+
+    // Header buttons, and dragging by the header.
+    const head = $('fyp-drag');
+    head.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.dataset.act === 'min') prefs.min = !prefs.min;
+      else if (b.dataset.act === 'hide') panelEl.style.display = 'none';
+      else if (b.dataset.act === 'dock') {
+        prefs.dock = prefs.dock === 'left' ? 'right' : 'left';
+        prefs.x = prefs.y = null;
+        panelEl.style.left = panelEl.style.top = panelEl.style.right = '';
+      }
+      savePrefs();
+      render();
+    });
+    const place = () => {
+      if (prefs.x == null) return;
+      const w = panelEl.offsetWidth;
+      const x = Math.max(0, Math.min(innerWidth - w, prefs.x));
+      const y = Math.max(0, Math.min(innerHeight - 44, prefs.y));
+      panelEl.style.left = x + 'px';
+      panelEl.style.top = y + 'px';
+      panelEl.style.right = 'auto';
+    };
+    head.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button') || e.button !== 0) return;
+      const r = panelEl.getBoundingClientRect();
+      const dx = e.clientX - r.left;
+      const dy = e.clientY - r.top;
+      const move = (ev) => { prefs.x = ev.clientX - dx; prefs.y = ev.clientY - dy; place(); };
+      const up = () => {
+        removeEventListener('pointermove', move);
+        removeEventListener('pointerup', up);
+        savePrefs();
+      };
+      addEventListener('pointermove', move);
+      addEventListener('pointerup', up);
+    });
+    addEventListener('resize', place);
+    place();
+
+    keyHandler = (e) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const k = e.key.toLowerCase();
+      if (k === 'h') { prefs.min = !prefs.min; panelEl.style.display = ''; savePrefs(); render(); e.preventDefault(); }
+      else if (k === 'r' && !running && !state.exp.active) { runHealed().then(render); e.preventDefault(); }
+      else if (k === 's' && (running || state.exp.active)) { stop(); e.preventDefault(); }
+    };
+    addEventListener('keydown', keyHandler);
+
+    // A light ticker so the elapsed clock moves while a run is in flight.
+    ticker = setInterval(() => { if (running || state.exp.active) render(); }, 500);
 
     measure = measureAccessibility();
     render();
@@ -2023,6 +2517,8 @@
     if (!state.recorded) setTimeout(() => { if (!state.recorded && !state.recording) recordBaseline(); }, 1200);
     return panelEl;
   }
+  let keyHandler = null;
+  let ticker = null;
 
   // ===========================================================================
   // 11. Public surface + teardown
@@ -2061,11 +2557,139 @@
     destroy() {
       clearChaos();
       if (panelEl) panelEl.remove();
+      if (keyHandler) removeEventListener('keydown', keyHandler);
+      clearInterval(ticker);
+      const st = document.querySelector('style[data-fyp-style]'); if (st) st.remove();
       const s = document.getElementById(DECOY_ID); if (s) s.remove();
       const o = document.getElementById(OVERLAY_ID); if (o) o.remove();
       panelEl = null;
       window[NS].active = false;
     },
+  };
+
+  // ===========================================================================
+  // 12. Agent API - the stable, JSON-only surface an AI assistant calls.
+  //
+  // Everything here returns plain serialisable data and never throws: a failure
+  // is a value (`ok:false`, `needsUser:true`, `userMessage`), because the
+  // assistant has to relay it to a person. The contract is documented in
+  // AGENTS.md and agent/tool-manifest.json - keep the three in step.
+  // ===========================================================================
+  const AGENT_VERSION = 1;
+  const rowView = (r) => ({
+    order: r.order, intent: r.intent, arm: r.arm || 'healed', route: r.route, routeIndex: r.routeIndex,
+    grade: r.grade, outcome: r.outcome, diagnosis: diagnosis(r), detail: r.detail, ms: r.ms,
+  });
+  const intentById = (id) => INTENTS.find((i) => i.id === id);
+  const agentBusy = () => running || state.exp.active;
+
+  async function agentReady(timeoutMs) {
+    const t0 = now();
+    while (now() - t0 < (timeoutMs || 25000)) {
+      const h = window[NS];
+      if (h && h.active && document.querySelector('[data-testid="tab-home"]') && state.recorded && !state.recording) return true;
+      await sleep(200);
+    }
+    return false;
+  }
+
+  function agentStatus() {
+    return {
+      version: AGENT_VERSION,
+      screen: detectScreen(),
+      busy: agentBusy(),
+      baselineRecorded: state.recorded,
+      armedBreaks: Object.keys(state.chaos.active).sort(),
+      accessibility: measureAccessibility(),
+    };
+  }
+
+  /** Describe what can be asked of the app: intents, breaks, parameters. */
+  function agentDescribe() {
+    return {
+      version: AGENT_VERSION,
+      intents: INTENTS.map((i) => ({ id: i.id, desc: i.desc, action: i.action, screen: i.screen, successDesc: i.successDesc })),
+      breaks: Object.keys(BREAKS).map((k) => ({ id: k, label: BREAKS[k].label, note: BREAKS[k].note })),
+      params: { caption: 'string - the post caption (default: a unique "fyp demo post <id>")' },
+      configSets: Object.keys(PRESETS),
+    };
+  }
+
+  async function agentFlow(opts) {
+    opts = opts || {};
+    if (agentBusy()) return { ok: false, needsUser: false, error: 'busy', userMessage: 'The assistant is already running a task.' };
+    const arm = opts.arm === 'baseline' ? 'baseline' : 'healed';
+    const breaks = (opts.breaks || []).filter((k) => BREAKS[k]);
+    if ((opts.breaks || []).length !== breaks.length) {
+      return { ok: false, error: 'unknown-break', userMessage: 'Unknown break id in: ' + (opts.breaks || []).join(', ') };
+    }
+    CAPTION_TEXT = opts.caption ? String(opts.caption) : DEFAULT_CAPTION + ' ' + Math.random().toString(36).slice(2, 6);
+    try {
+      // Break first, THEN run: runHealed()/runBaseline() capture the armed set and
+      // re-apply it after their own reset (see the trap noted in the plan).
+      await resetApp();
+      breaks.forEach((k) => applyBreak(k));
+      if (arm === 'baseline') await runBaseline(); else await runHealed();
+      const runId = state.runId;
+      const rows = state.log.filter((r) => r.run === runId && (arm === 'baseline') === (r.arm === 'baseline'));
+      const summary = state.runs[arm] || { ok: 0, total: INTENTS.length };
+      const failed = rows.find((r) => r.outcome !== 'success' && r.outcome !== 'failed-predicate') || rows.find((r) => r.outcome !== 'success');
+      const ok = summary.ok === summary.total;
+      const out = {
+        ok,
+        arm,
+        caption: CAPTION_TEXT,
+        breaks,
+        stepsOk: summary.ok,
+        stepsTotal: summary.total,
+        halted: !!summary.stopped,
+        needsUser: !ok,
+        userMessage: ok ? null : (arm === 'healed' && state.lastFatal) || (failed ? 'Step "' + failed.intent + '" failed: ' + failed.detail : 'The run did not complete.'),
+        rows: rows.map(rowView),
+      };
+      if (opts.screenshot && state.lastShot) out.screenshot = state.lastShot;
+      return out;
+    } catch (e) {
+      return { ok: false, needsUser: true, error: 'exception', userMessage: 'The assistant hit an internal error: ' + (e && e.message), rows: [] };
+    } finally {
+      clearChaos();
+    }
+  }
+
+  async function agentIntent(id, params) {
+    const it = intentById(id);
+    if (!it) return { ok: false, error: 'unknown-intent', userMessage: 'Unknown intent: ' + id };
+    if (agentBusy()) return { ok: false, error: 'busy', userMessage: 'The assistant is already running a task.' };
+    if (params && params.caption) CAPTION_TEXT = String(params.caption);
+    running = true;
+    try {
+      const row = await runIntent(it, { order: 1 });
+      const ok = row.outcome === 'success';
+      return { ok, needsUser: !ok, userMessage: ok ? null : honestFailure(it, row), row: rowView(row), status: agentStatus() };
+    } catch (e) {
+      return { ok: false, needsUser: true, error: 'exception', userMessage: 'The assistant hit an internal error: ' + (e && e.message) };
+    } finally {
+      running = false;
+      render();
+    }
+  }
+
+  async function agentExperiment(n, set) {
+    await runExperiment(Math.max(1, Math.min(50, n || 1)), set || 'demo');
+    return JSON.parse(resultsJson());
+  }
+
+  window.__FYP_AGENT = {
+    version: AGENT_VERSION,
+    ready: agentReady,
+    describe: agentDescribe,
+    status: agentStatus,
+    runFlow: agentFlow,
+    runIntent: agentIntent,
+    survey: async () => { await surveyScreens(); return state.survey; },
+    experiment: agentExperiment,
+    results: () => JSON.parse(resultsJson()),
+    resetApp: async () => { await resetApp(); return agentStatus(); },
   };
 
   const boot = () => { if (document.body) panel(); else setTimeout(boot, 120); };

@@ -3,3 +3,8 @@ __pycache__/
 fyp-mvp/logs/
 # insta clone/ is its own git repository (insta-clone); it is committed there, not here.
 insta clone/
+
+# agent runner
+agent/node_modules/
+agent/results/
+*.shot.png

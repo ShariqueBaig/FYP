@@ -1,0 +1,17 @@
+{
+  "name": "fyp-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless runner for the FYP self-healing GUI harness, for AI assistants.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "setup": "bash setup.sh",
+    "serve": "node server.mjs",
+    "describe": "node fyp.mjs describe",
+    "run": "node fyp.mjs run"
+  },
+  "dependencies": {
+    "playwright": "1.49.1"
+  }
+}

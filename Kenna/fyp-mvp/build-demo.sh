@@ -25,6 +25,21 @@ if [ ! -d "$APP/node_modules" ]; then
   exit 1
 fi
 
+# The demo runs offline and never logs in, but App.tsx compiles liveConfig.ts
+# (the live Firebase login) into the bundle. Build with a blank one so the
+# published bundle can never carry a credential; the real file is restored on exit.
+LIVE="$APP/liveConfig.ts"
+if [ -f "$LIVE" ]; then
+  LIVE_BAK="$(mktemp)"
+  cp "$LIVE" "$LIVE_BAK"
+  trap 'cp "$LIVE_BAK" "$LIVE"; rm -f "$LIVE_BAK"' EXIT
+fi
+cat > "$LIVE" <<'TS'
+// Credential-free stand-in used only while building the demo bundle.
+export const LIVE_LOGIN = { email: '', password: '' };
+export const USE_STORAGE = false;
+TS
+
 echo "==> 1/3  exporting the mock app for web"
 ( cd "$APP" && CI=1 BROWSER=none EXPO_NO_TELEMETRY=1 ./node_modules/.bin/expo export --platform web )
 

@@ -1,0 +1,45 @@
+{
+  "name": "fyp_gui_harness",
+  "description": "Drive the mock Instagram app through intents with a self-healing ladder (id > label > text > scoped > vision > keyboard). Every call prints one JSON document. On failure, `userMessage` must be relayed to the user as-is.",
+  "invoke": "node agent/fyp.mjs <command> [flags]",
+  "exit_codes": { "0": "completed", "1": "ran, could not finish - tell the user (needsUser=true)", "2": "could not run (setup/usage/infrastructure)" },
+  "tools": [
+    {
+      "name": "describe",
+      "command": "node agent/fyp.mjs describe",
+      "description": "List intents, available UI breaks (chaos) and parameters.",
+      "input_schema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "create_post",
+      "command": "node agent/fyp.mjs run --caption <caption> [--breaks B1,B4] [--arm healed|baseline] [--shot file.png]",
+      "description": "Run the full create-post flow (9 intents) and verify the post appears in the feed. Returns stepsOk/stepsTotal, per-step route used (id/label/text/scoped/vision, +keyboard), and, if it could not finish, needsUser=true with a first-person userMessage naming the step it is stuck on.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "caption": { "type": "string", "description": "Caption to post. Omit for a unique demo caption." },
+          "breaks": { "type": "array", "items": { "type": "string", "pattern": "^B[1-8]$" }, "description": "UI breaks to inject first (testing only). Never set for a real user task." },
+          "arm": { "type": "string", "enum": ["healed", "baseline"], "description": "baseline = recorded-locator script, for comparison only." }
+        }
+      }
+    },
+    {
+      "name": "run_intent",
+      "command": "node agent/fyp.mjs intent <intent.id> [--caption <caption>]",
+      "description": "Run ONE intent against the current app state (the runner starts a fresh page each call, so only post.open is valid cold; use create_post for the whole flow).",
+      "input_schema": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" }, "caption": { "type": "string" } } }
+    },
+    {
+      "name": "accessibility_survey",
+      "command": "node agent/fyp.mjs survey",
+      "description": "Per screen: how many controls expose no accessible name / no role. Screen readers face the same gaps.",
+      "input_schema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "experiment",
+      "command": "node agent/fyp.mjs experiment --n <N> --set demo|full --out <dir>",
+      "description": "Baseline vs healed, N repetitions over break configurations. Writes results.json, summary.csv, attempt-log.csv to <dir>. Slow: demo set is 6 configs x 2 arms per repetition.",
+      "input_schema": { "type": "object", "properties": { "n": { "type": "integer", "minimum": 1, "maximum": 50 }, "set": { "type": "string", "enum": ["demo", "full"] }, "out": { "type": "string" } } }
+    }
+  ]
+}
