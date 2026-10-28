@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+fyp-mvp/logs/
+# insta clone/ is its own git repository (insta-clone); it is committed there, not here.
+insta clone/
