@@ -543,3 +543,12 @@ Note: the plan said "7 breaks"; there are now 8. Demo step 9 ("break everything"
 - **Latent bug fixed:** screen 4 was never detected, because the heading renders in capitals (`innerText` applies `text-transform`). `goHome` therefore could not leave it either.
 - **Baseline fairness:** the recorded-locator arm now scrolls its target into view, as Playwright/Selenium do. Without it, the baseline failed on the *healthy* app because the More-options row is below the fold, which an examiner would call a strawman.
 - Housekeeping: `.gitignore` for `__pycache__/`, `fyp-mvp/logs/`, `insta clone/dist/` (rebuild with `build-demo.sh`).
+
+### 2026-10-28 — retest on the redesigned mockup
+
+The mockup was restyled (dark Instagram theme, `pkAssets.ts`). All harness hooks (`testID`s, labels, headings) survived; rebuilt with `build-demo.sh` and retested at 410x779 and 1280x800.
+
+- **Healed arm:** clean, B1-B7 and B1+B2+B3+B4 complete 9/9; B8 stops at step 1 with the honest message. B1-B7 all armed together now stops honestly too (the geometry guard refuses once the nav no longer matches what it learned).
+- **Accessibility survey (new design):** feed 3/10, gallery 1/13, caption 0/11, more-options 5/8 controls with no accessible name; **every control on every screen exposes no role** (all are bare `div[tabindex]`).
+- **Fixed:** `gallery.select` fell back to vision (about 4.8 s) on every run after the first, because the app keeps the previous selection and the id route re-clicked the selected cell. The selection fade sits on a wrapper *above* the image element, so the opacity read was always 1; it now composes opacity down the tree, and the intent picks a cell that is not already selected. Clean runs now use `id` (about 0.7 s).
+- **Gotcha, cost me a wrong test run:** after a rebuild the static server and the browser cache can both serve the **old** `index.html`, which points at a bundle name that no longer exists. Restart the server and load `?demo=1&nc=N` (any new `nc`) after every rebuild, and check that the loaded `AppEntry-<hash>.js` matches `dist/_expo/static/js/web/`.

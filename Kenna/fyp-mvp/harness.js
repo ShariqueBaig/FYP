@@ -243,9 +243,21 @@
    * unselected one. Read the image-bearing element instead.
    */
   function cellOpacity(el) {
+    // Opacity composes down the tree: the selection fade can sit on a wrapper
+    // ABOVE the element that paints the image, so read the product of every
+    // opacity from the cell down to the image-bearing element, not just the
+    // image's own (which is 1 even for the selected photo).
+    const product = (from, to) => {
+      let o = 1;
+      for (let n = to; n; n = n.parentElement) {
+        o *= parseFloat(getComputedStyle(n).opacity);
+        if (n === from) break;
+      }
+      return o;
+    };
     for (const d of [el].concat(Array.from(el.querySelectorAll('*')))) {
       const bg = getComputedStyle(d).backgroundImage;
-      if (bg && bg !== 'none') return parseFloat(getComputedStyle(d).opacity);
+      if (bg && bg !== 'none') return product(el, d);
     }
     return parseFloat(getComputedStyle(el).opacity);
   }
@@ -303,8 +315,15 @@
       action: 'click',
       desc: 'Choose a photo from the gallery',
       // Cell 2, not cell 0: cell 0 is already the default selection, so choosing
-      // it changes nothing and the success predicate could never become true.
-      testId: 'gallery-cell-2',
+      // it changes nothing. And once cell 2 has been chosen (the app keeps the
+      // selection between runs) it is the selected one, so take cell 3 next.
+      testId: (cs) => {
+        const selected = (hook) => {
+          const c = cs.find((x) => x.hook === hook);
+          return !!c && cellOpacity(c.el) < 0.9;
+        };
+        return selected('gallery-cell-2') ? 'gallery-cell-3' : 'gallery-cell-2';
+      },
       labels: ['gallery photo'],
       anchor: 'Recents',
       region: 'gallery-grid',
@@ -447,10 +466,13 @@
   /** Route 0 - an explicit id. Version-pinned: survives nothing but a build. */
   const route_id = (intent, cs) => {
     if (!intent.testId) return [];
-    const exact = cs.filter((c) => c.hook === intent.testId);
+    // A hook may depend on state: choosing the photo that is already selected
+    // changes nothing, so the gallery intent names a cell that is not selected.
+    const want = typeof intent.testId === 'function' ? intent.testId(cs) : intent.testId;
+    const exact = cs.filter((c) => c.hook === want);
     if (exact.length) return exact;
     // Fall back to a prefix match so `gallery-cell-0` can stand for the group.
-    const prefixes = intent.testId.endsWith('-0') ? [intent.testId.replace(/-0$/, '-')] : [];
+    const prefixes = want.endsWith('-0') ? [want.replace(/-0$/, '-')] : [];
     return cs.filter((c) => c.hook && prefixes.some((p) => c.hook.startsWith(p)));
   };
 
