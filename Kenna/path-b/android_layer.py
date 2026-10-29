@@ -87,6 +87,20 @@ def emit(event, **kw):
             fh.write(json.dumps(dict(kw, event=event, t=_t.time())) + chr(10))
     except OSError:
         pass
+    flag = os.environ.get("FYP_PAUSE")
+    if flag and os.path.exists(flag):                     # the dashboard's Pause button: hold here until the flag is removed
+        try:
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"event": "paused", "t": _t.time()}) + chr(10))
+        except OSError:
+            pass
+        while os.path.exists(flag):
+            _t.sleep(0.2)
+        try:
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"event": "resumed", "t": _t.time()}) + chr(10))
+        except OSError:
+            pass
     if event in ("act", "check", "intent-end"):
         try:
             _t.sleep(float(os.environ.get("FYP_PACE", "0")))
@@ -542,11 +556,17 @@ class Layer:
         cs = controls(nodes)
         if it.capture:
             it.capture(nodes)
-        emit("intent-start", intent=it.id, goal=it.desc, success=it.success_desc, controls=len(cs), routes=ROUTES)
+        emit("intent-start", intent=it.id, goal=it.desc, success=it.success_desc, controls=len(cs), routes=ROUTES,
+             looking_for={k: v for k, v in (("id", it.rid), ("label", it.content_desc), ("text", it.text), ("container", it.anchor)) if v},
+             onscreen=[(n.text or n.name or n.desc or "")[:24].strip() for n in cs[:12]])
         for route in ROUTES:
             hits = self._candidates(route, it, cs, nodes)
             multi = route == "semantic"
-            emit("route", intent=it.id, route=route, hits=len(hits), usable=multi or len(hits) == 1)
+            emit("route", intent=it.id, route=route, hits=len(hits), usable=multi or len(hits) == 1,
+                 query={"resource-id": it.rid, "content-desc": it.content_desc, "text": it.text, "scoped": it.anchor,
+                        "learned": "a remembered answer" if (self.use_memory and (self.mem.get(it.id) or {}).get("learned")) else "",
+                        "semantic": "", "geometry": str(it.region) if it.region else ""}.get(route, ""),
+                 examples=[(h.text or h.name or h.desc or "")[:40] for h in hits[:3]])
             if not multi and len(hits) != 1:
                 attempts.append(f"{route}({len(hits)})")
                 continue

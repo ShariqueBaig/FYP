@@ -2,71 +2,110 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Kenna Live</title>
 <style>
-:root{--bg:#0e0f13;--s1:#15171c;--s2:#1b1e25;--bd:#2a2e38;--tx:#e7e9ee;--mu:#9aa0b0;--ac:#6d8bff;--ok:#3ddc97;--bad:#ff6b6b;--warn:#ffb454}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,"Segoe UI",sans-serif}
-header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--bd);flex-wrap:wrap}
-header h1{font-size:18px;margin:0 auto 0 0}header small{color:var(--mu);font-weight:400;margin-left:8px}
-select,button{font:inherit;color:var(--tx);background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:7px 12px}
-button{cursor:pointer}button.pri{background:#3f5fd9;border-color:#3f5fd9;color:#fff;font-weight:600}button:disabled{opacity:.5;cursor:default}
-button.link{background:none;border:0;color:var(--ac);padding:2px 6px;font-size:13px}
-.badge{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--bd);color:var(--mu)}.badge.stub{color:var(--warn);border-color:var(--warn)}.badge.live{color:var(--ok);border-color:var(--ok)}
-main{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:20px;padding:20px;max-width:1300px;margin:0 auto}
-@media(max-width:800px){main{grid-template-columns:1fr}}
-.phone{position:relative;background:#000;border:2px solid var(--bd);border-radius:28px;overflow:hidden;aspect-ratio:1080/2400;width:100%}
+:root{--bg:#0b0c10;--s1:#14161c;--s2:#1c1f27;--s3:#242833;--bd:#2c303c;--tx:#f1f3f8;--mu:#a3a9ba;--ac:#7c97ff;--acbg:#3f5fd9;--ok:#3ddc97;--bad:#ff7a7a;--warn:#ffbe5c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.4 system-ui,"Segoe UI",sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:7px 16px;background:rgba(11,12,16,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd);flex-wrap:wrap}
+header h1{font-size:16px;margin:0 auto 0 0;letter-spacing:-.01em}header h1 small{display:block;font-size:12px;font-weight:400;color:var(--mu);letter-spacing:0}
+label{font-size:13px;color:var(--mu);display:flex;flex-direction:column;gap:2px}
+select,button{font:inherit;font-size:13px;color:var(--tx);background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:8px 12px}
+button{cursor:pointer}button:hover:not(:disabled){background:var(--s3)}button:disabled{opacity:.5;cursor:default}
+button.pri{background:var(--acbg);border-color:var(--acbg);font-weight:700;padding:6px 14px;font-size:13px}button.pri:hover:not(:disabled){background:#3552c4}
+button.link{background:none;border:0;color:var(--ac);padding:2px 6px;font-size:14px}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.badge{font-size:13px;padding:4px 11px;border-radius:99px;border:1px solid var(--bd);color:var(--mu);white-space:nowrap}.badge.stub{color:var(--warn);border-color:var(--warn)}.badge.live{color:var(--ok);border-color:var(--ok)}
+
+main{display:grid;grid-template-columns:minmax(240px,clamp(260px,28vw,380px)) minmax(0,1fr);gap:16px;padding:12px;max-width:1500px;margin:0 auto;align-items:start}
+@media(max-width:860px){main{grid-template-columns:minmax(0,1fr)}.phonewrap{position:static!important}}
+.phonewrap{position:sticky;top:64px}
+.phone{position:relative;background:#000;border:10px solid #07080b;outline:1px solid var(--bd);border-radius:38px;overflow:hidden;aspect-ratio:1080/2400;width:min(100%,calc((100vh - 130px)*.45));margin:0 auto;box-shadow:0 24px 60px rgba(0,0,0,.6)}
 .phone img{width:100%;height:100%;display:block;object-fit:fill}
-.box{position:absolute;border:3px solid var(--ac);background:rgba(109,139,255,.18);border-radius:6px;transition:all .25s;pointer-events:none}
-.box.tap{border-color:var(--warn);background:rgba(255,180,84,.28);box-shadow:0 0 0 6px rgba(255,180,84,.25)}
-.box.ok{border-color:var(--ok);background:rgba(61,220,151,.22)}.box.bad{border-color:var(--bad);background:rgba(255,107,107,.22)}
-.box span{position:absolute;left:0;top:-22px;font-size:11px;padding:1px 6px;border-radius:4px;color:#fff;background:#222;white-space:nowrap}
-.card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;margin-bottom:14px}
-.card h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin:0 0 8px;font-weight:600;display:flex;align-items:center;gap:8px}
-.card h2 .sp{margin-left:auto}
-#scene b{font-size:18px}#scene p{margin:4px 0 0;color:var(--mu)}
-.pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:99px;border:1px solid var(--bd);color:var(--mu);margin-right:6px;vertical-align:middle}
+.live{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 0;font-size:13px;color:var(--mu)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mu)}.dot.on{background:var(--ok);box-shadow:0 0 0 4px rgba(61,220,151,.22);animation:pulse 1.3s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(61,220,151,0)}}
+@media(prefers-reduced-motion:reduce){.dot.on{animation:none}.box,.rung{transition:none!important}}
+.box{position:absolute;border:4px solid var(--ac);background:rgba(124,151,255,.2);border-radius:8px;transition:all .25s;pointer-events:none}
+.box.tap{border-color:var(--warn);background:rgba(255,190,92,.3);box-shadow:0 0 0 8px rgba(255,190,92,.28)}
+.box.ok{border-color:var(--ok);background:rgba(61,220,151,.25)}.box.bad{border-color:var(--bad);background:rgba(255,122,122,.25)}
+.box span{position:absolute;left:0;top:-28px;font-size:13px;font-weight:600;padding:2px 8px;border-radius:6px;color:#fff;background:#111;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:9px 13px;margin-bottom:9px;min-width:0}
+.card>h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--mu);margin:0 0 6px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.card>h2::before{content:"\25BE";font-size:14px;width:14px;transition:transform .15s}
+.card.collapsed>h2{margin-bottom:0}.card.collapsed>h2::before{transform:rotate(-90deg)}
+.card.collapsed>:not(h2){display:none}
+.card>h2 .sp{margin-left:auto}
+.hero{border-color:#3a4068;background:linear-gradient(180deg,#171a26,var(--s1))}
+.prog{display:flex;gap:6px;margin:0 0 10px}.prog i{flex:1;height:6px;border-radius:9px;background:var(--s3)}
+.prog i.cur{background:var(--ac)}.prog i.ok{background:var(--ok)}.prog i.bad{background:var(--bad)}
+#sceneInfo .t{font-size:16px;font-weight:700;letter-spacing:-.01em;margin:6px 0 2px;line-height:1.2}
+#sceneInfo p{margin:0;color:var(--mu);font-size:13px}
+.pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;border:1px solid var(--bd);color:var(--mu);margin-right:6px;vertical-align:middle;font-weight:600}
 .pill.exp-ok{color:var(--ok);border-color:var(--ok)}.pill.exp-stop{color:var(--warn);border-color:var(--warn)}.pill.mdl{color:var(--ac);border-color:var(--ac)}
-.ladder{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px}
-.rung{flex:1 0 82px;padding:8px 6px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);text-align:center;font-size:13px}
-.rung i{display:block;font-style:normal;font-size:11px;color:var(--mu)}
-.rung small{display:block;color:var(--mu);font-size:11px;min-height:15px}
-.arrow{flex:0 0 18px;align-self:center;text-align:center;color:var(--mu)}
-.rung.skip{background:var(--bg)}.rung.amb{border-color:var(--warn)}.rung.try{border-color:var(--ac);box-shadow:0 0 0 2px rgba(109,139,255,.3)}
-.rung.win{border-color:var(--ok);background:rgba(61,220,151,.12)}.rung.lose{border-color:var(--bad)}
-.hint{color:var(--mu);font-size:13px;margin:8px 0 0}
-.think{font-size:15px;min-height:48px}.think .conf{color:var(--mu)}
-.result{padding:12px 16px;border-radius:12px;font-weight:600;display:none}
-.result.ok{display:block;background:rgba(61,220,151,.14);border:1px solid var(--ok)}
-.result.stop{display:block;background:rgba(255,180,84,.14);border:1px solid var(--warn)}
-.result small{display:block;font-weight:400;color:var(--mu)}
-#log{max-height:220px;overflow:auto;font:12.5px/1.6 ui-monospace,Consolas,monospace}
-#log div{border-bottom:1px solid var(--bd);padding:2px 0}#log .t{color:var(--mu)}
-.sum{display:flex;gap:10px;flex-wrap:wrap}.sum div{flex:1 1 90px;text-align:center;padding:8px;border-radius:10px;background:var(--s2)}.sum b{display:block;font-size:20px}
+.think{margin-top:10px;padding:7px 12px;border-left:4px solid var(--ac);background:var(--s2);border-radius:0 8px 8px 0;font-size:14px;line-height:1.35;min-height:46px}
+.think .conf{display:block;margin-top:1px;color:var(--mu);font-size:12px}
+
+.ladder{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:4px 2px 6px}
+.rung{flex:1 0 72px;padding:6px 3px;border-radius:10px;border:2px solid var(--bd);background:var(--s2);text-align:center;font-size:12.5px;font-weight:600;transition:all .2s}
+.rung i{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;background:var(--s3);font-style:normal;font-size:11px;color:var(--mu);margin-bottom:2px}
+.rung small{display:block;color:var(--mu);font-size:11px;font-weight:400;min-height:14px;margin-top:0}
+.arrow{flex:0 0 22px;align-self:center;text-align:center;color:var(--mu);font-size:20px}
+.rung.skip{background:var(--bg);color:var(--mu)}.rung.amb{border-color:var(--warn)}.rung.try{border-color:var(--ac);box-shadow:0 0 0 4px rgba(124,151,255,.25)}
+.rung.win{border-color:var(--ok);background:rgba(61,220,151,.14);transform:scale(1.04)}.rung.win i{background:var(--ok);color:#06210f}
+.rung.lose{border-color:var(--bad)}.rung.lose i{background:var(--bad);color:#2a0606}
+.hint{color:var(--mu);font-size:12px;margin:6px 0 0}
+
+.result{padding:8px 13px;border-radius:12px;font-weight:700;font-size:14px;display:none;margin-bottom:9px}
+.result.ok{display:block;background:rgba(61,220,151,.14);border:2px solid var(--ok)}
+.result.stop{display:block;background:rgba(255,190,92,.14);border:2px solid var(--warn)}
+.result small{display:block;font-weight:400;color:var(--mu);font-size:12px;margin-top:1px}
+.result .note{display:block;margin-top:5px;padding:5px 9px;border-radius:7px;background:rgba(255,190,92,.16);color:var(--warn);font-size:12px;font-weight:600}
+
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.pick{display:flex;gap:7px;align-items:flex-start;padding:6px 8px;border:1px solid var(--bd);border-radius:12px;background:var(--s2);cursor:pointer}
+.pick input{margin-top:4px;width:18px;height:18px;flex:none}.pick .d{color:var(--mu);font-size:12px;margin-top:1px}
+.pick.cur{border-color:var(--ac);background:rgba(124,151,255,.14)}.pick.done-ok .n::after{content:" \2713";color:var(--ok)}.pick.done-bad .n::after{content:" \2717";color:var(--bad)}
+.res{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd)}.res:last-child{border:0}.res .g{margin-left:auto;text-align:right}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:12px}.sum div{text-align:center;padding:6px 5px;border-radius:8px;background:var(--s2)}.sum b{display:block;font-size:17px;line-height:1.1}
 .sum span{font-size:11px;color:var(--mu)}
-.pick{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-bottom:1px solid var(--bd);cursor:pointer}
-.pick:last-child{border-bottom:0}.pick input{margin-top:5px;width:16px;height:16px}.pick .d{color:var(--mu);font-size:13px}
-.pick.cur{background:rgba(109,139,255,.12);border-radius:8px}.pick.done-ok .n::after{content:" \2713";color:var(--ok)}.pick.done-bad .n::after{content:" \2717";color:var(--bad)}
-.res{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:14px}.res .g{margin-left:auto}
-table{width:100%;border-collapse:collapse;font-size:13.5px}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{color:var(--mu);font-weight:600;font-size:12px}
-details summary{cursor:pointer;color:var(--mu);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 7px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{color:var(--mu);font-weight:600;font-size:13px}
+#log{max-height:170px;overflow:auto;font:11.5px/1.45 ui-monospace,Consolas,monospace}#log div{border-bottom:1px solid var(--bd);padding:3px 0}#log .t{color:var(--mu)}
+.dot.hold{background:var(--warn);box-shadow:0 0 0 4px rgba(255,190,92,.25)}
+.banner{display:none;margin:0 0 10px;padding:7px 12px;border-radius:8px;background:rgba(255,190,92,.16);border:1px solid var(--warn);color:var(--warn);font-weight:600;font-size:13px}.banner.on{display:block}
+.steps{list-style:none;margin:8px 0 0;padding:0;font-size:12.5px;color:var(--mu)}
+.steps li{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--bd)}.steps li:last-child{border:0;color:var(--tx)}
+.steps .ic{flex:none;width:16px;text-align:center;font-weight:700}.steps .ic.n{color:var(--mu)}.steps .ic.w{color:var(--warn)}.steps .ic.y{color:var(--ok)}.steps .ic.x{color:var(--bad)}
+.steps q{color:var(--tx);quotes:'"' '"'}
+.card.hero .think b{color:#fff}
 </style></head><body>
 <header>
-  <h1>Kenna live <small>intent-aware, self-healing automation</small></h1>
+  <h1>Kenna live<small>intent-aware, self-healing automation</small></h1>
   <span class="badge" id="model">model: not started</span>
-  <label>Model <select id="sem"><option value="offline">offline stand-in (not a real model)</option><option value="openrouter">openrouter (real model)</option><option value="anthropic">anthropic (real model)</option><option value="none">no model</option></select></label>
-  <label>Speed <select id="pace"><option value="0.5">fast</option><option value="1.6" selected>demo</option><option value="3">slow</option></select></label>
-  <button class="pri" id="go">&#9654; Run selected</button><button id="stop">Stop</button>
+  <label>Model<select id="sem"><option value="none">No model (rules only)</option><option value="offline" selected>Offline stand-in (word matching, NOT an AI)</option><option value="openrouter">OpenRouter (real model)</option><option value="anthropic">Anthropic (real model)</option></select></label>
+  <label>Speed<select id="pace"><option value="0.5">Fast</option><option value="1.6" selected>Demo</option><option value="3">Slow</option></select></label>
+  <button id="fold" title="Collapse or expand every section">Collapse all</button>
+  <button class="pri" id="go">&#9654; Run selected</button><button id="pause" disabled>&#10074;&#10074; Pause</button><button id="stop">Stop</button>
 </header>
 <main>
-  <div><div class="phone"><img id="scr" src="/screen.png" alt="Live emulator screen"><div id="boxes"></div></div></div>
+  <div class="phonewrap">
+    <div class="phone"><img id="scr" src="/screen.png" alt="Live emulator screen"><div id="boxes"></div></div>
+    <div class="live"><span class="dot" id="dot"></span><span id="livetxt">Idle</span></div>
+  </div>
   <div>
-    <div class="card"><h2>Choose tests <span class="sp"><button class="link" id="all">all</button><button class="link" id="none">none</button></span></h2><div id="picks">Loading...</div></div>
-    <div class="card" id="scene"><h2>Now</h2><b>Pick tests, then press Run selected</b><p>Make sure the emulator is visible and the phone is on the Settings app.</p></div>
-    <div class="card"><h2>The ladder: ways to find the control, tried in this order</h2><div class="ladder" id="ladder"></div>
+    <div class="card hero" id="scene" data-k="now"><h2>Now</h2>
+      <div class="banner" id="paused" role="status">&#10074;&#10074; Paused. The phone is waiting; press Resume to continue.</div>
+      <div class="prog" id="prog"></div>
+      <div id="sceneInfo"><div class="t">Pick tests, then press Run selected</div><p>Make sure the emulator is visible and the phone is on the Settings app.</p></div>
+      <div class="think" id="think" aria-live="polite">Waiting.</div>
+      <ol class="steps" id="steps"></ol>
+    </div>
+    <div class="card" data-k="ladder"><h2>The ladder: ways to find the control, tried in this order</h2><div class="ladder" id="ladder"></div>
       <p class="hint">Each way counts only if it points at exactly one control. After every tap the next screen is checked; if nothing changed, the next way is tried. The model is asked only after the free ways fail.</p></div>
-    <div class="card"><h2>Thinking</h2><div class="think" id="think">Waiting.</div></div>
-    <div class="result" id="result"></div>
-    <div class="card" style="margin-top:14px"><h2>This run</h2><div id="runres" class="hint">Nothing yet.</div>
-      <div class="sum" style="margin-top:10px"><div><b id="s-exp">0/0</b><span>as expected</span></div><div><b id="s-ok">0</b><span>completed</span></div><div><b id="s-stop">0</b><span>stopped honestly</span></div><div><b id="s-wasted">0</b><span>wasted taps</span></div><div><b id="s-calls">0</b><span>model calls</span></div></div></div>
-    <div class="card"><h2>Evidence behind it (measured earlier, not this run)</h2>
+    <div class="result" id="result" aria-live="polite"></div>
+    <div class="card" data-k="run"><h2>This run</h2><div id="runres" class="hint" style="margin:0">Nothing yet.</div>
+      <div class="sum"><div><b id="s-exp">0/0</b><span>as expected</span></div><div><b id="s-ok">0</b><span>completed</span></div><div><b id="s-stop">0</b><span>stopped honestly</span></div><div><b id="s-wasted">0</b><span>wasted taps</span></div><div><b id="s-calls">0</b><span>model calls</span></div></div></div>
+    <div class="card" data-k="tests"><h2>Choose tests <span class="sp"><button class="link" id="all">all</button><button class="link" id="none">none</button></span></h2><div class="pgrid" id="picks">Loading...</div></div>
+    <div class="card" data-k="evidence"><h2>Evidence behind it (measured earlier, not this run)</h2>
       <table><tr><th>Question</th><th>Result</th><th>Where</th></tr>
       <tr><td>Recorded script vs ladder, web app, UI changed</td><td>script 0% [0-28], ladder 100% [72-100] (N=10 per cell, 12 configs)</td><td>results/published/rules_full_n10</td></tr>
       <tr><td>Model helper, web, wording and layout changed</td><td>rules alone 0%, hybrid 100% [72-100]; a bare model 0% with silent wrong taps (qwen3.7-flash, N=10)</td><td>results/published/semantic_n10_qwen37flash</td></tr>
@@ -74,69 +113,105 @@ details summary{cursor:pointer;color:var(--mu);font-size:12px;letter-spacing:.08
       <tr><td>Android controls with no accessible name</td><td>2% (78% by own attributes alone)</td><td>path-b/dumps/sessions</td></tr>
       <tr><td>Automated unit checks</td><td>86+ counted, all passing</td><td>agent/*.test.mjs, path-b selftests</td></tr></table>
       <p class="hint">Limits: one mock web app, stock Android Settings, one real model so far, no user study. The offline stand-in is never a model result.</p></div>
-    <div class="card"><details><summary>Log</summary><div id="log"></div></details></div>
+    <div class="card" data-k="log"><h2>Log</h2><div id="log"></div></div>
   </div>
 </main>
 <script>
 const ROUTES=["resource-id","content-desc","text","scoped","learned","semantic","geometry"];
 const NAMES={"resource-id":"id","content-desc":"label","text":"text","scoped":"container","learned":"remembered","semantic":"model","geometry":"position"};
-let since=0,run=false,sc,scenes=[],cur=null,sel=new Set();
+let runNoModel=false,since=0,run=false,sc,scenes=[],cur=null,sel=new Set(),stub=false,total=0;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function resetScore(){sc={ok:0,stop:0,wasted:0,calls:0,exp:0,done:0,rows:[]};score();$('runres').textContent='Nothing yet.'}
-function ladderReset(){$('ladder').innerHTML=ROUTES.map((r,i)=>(i?'<span class="arrow">&rsaquo;</span>':'')+`<div class="rung" id="r-${r}"><i>${i+1}</i>${NAMES[r]}<small></small></div>`).join('')}
+function ladderReset(){$('ladder').innerHTML=ROUTES.map((r,i)=>(i?'<span class="arrow" aria-hidden="true">&rsaquo;</span>':'')+`<div class="rung" id="r-${r}"><i>${i+1}</i><br>${r==='semantic'&&stub?'model (stand-in)':NAMES[r]}<small></small></div>`).join('')}
 function rung(r,cls,txt){const e=$('r-'+r);if(!e)return;e.className='rung '+cls;e.querySelector('small').textContent=txt||''}
 function box(b,cls){$('boxes').innerHTML=b?`<div class="box ${cls||''}" style="left:${b.x0*100}%;top:${b.y0*100}%;width:${(b.x1-b.x0)*100}%;height:${(b.y1-b.y0)*100}%"><span>${esc(b.label)}</span></div>`:''}
-function log(t,x){const d=document.createElement('div');d.innerHTML=`<span class="t">${new Date(t*1000).toLocaleTimeString()}</span> ${x}`;$('log').prepend(d)}
-function think(h){$('think').innerHTML=h}
+function log(t,x){const d=document.createElement('div');d.innerHTML=`<span class="t">${new Date(t*1000).toLocaleTimeString()}</span> ${x}`;$('log').prepend(d);while($('log').children.length>150)$('log').lastChild.remove()}
+function step(cls,ic,t){const li=document.createElement('li');li.innerHTML=`<span class="ic ${cls}">${ic}</span><span>${t}</span>`;$('steps').appendChild(li)}
+function think(h,sub){$('think').innerHTML=h+(sub?`<span class="conf">${sub}</span>`:'')}
+function prog(){const a=[];for(let i=0;i<total;i++){const r=sc.rows[i];a.push(`<i class="${r?(r.asExpected?'ok':'bad'):(i===sc.rows.length?'cur':'')}"></i>`)}$('prog').innerHTML=a.join('')}
+function live(on,txt){$('dot').className='dot'+(on?' on':'');$('livetxt').textContent=txt}
+const noModel=()=>$('sem').value==='none';
+const expFor=s=>s.model&&noModel()?'stop':s.expect;
 const expPill=x=>x==='success'?'<span class="pill exp-ok">expected: completes</span>':'<span class="pill exp-stop">expected: stops honestly</span>';
 function renderPicks(){
-  $('picks').innerHTML=scenes.map(s=>`<label class="pick" id="p-${s.id}"><input type="checkbox" data-id="${s.id}" ${sel.has(s.id)?'checked':''}><div><span class="n"><b>${s.id}. ${esc(s.name)}</b></span> ${expPill(s.expect)}${s.model?'<span class="pill mdl">uses the model</span>':''}<div class="d">${esc(s.say)}</div></div></label>`).join('');
+  $('picks').innerHTML=scenes.map(s=>`<label class="pick" id="p-${s.id}"><input type="checkbox" data-id="${s.id}" ${sel.has(s.id)?'checked':''}><div><span class="n"><b>${s.id}. ${esc(s.name)}</b></span><div style="margin-top:4px">${expPill(expFor(s))}${s.model?'<span class="pill mdl">needs the model to complete</span>':''}</div><div class="d">${esc(s.say)}${s.model&&noModel()?' <b style="color:var(--warn)">With no model selected this one is expected to stop.</b>':''}</div></div></label>`).join('');
   $('picks').querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?sel.add(+i.dataset.id):sel.delete(+i.dataset.id);try{localStorage.setItem('kenna-sel',JSON.stringify([...sel]))}catch(e){}$('go').disabled=run||!sel.size});
   $('go').disabled=run||!sel.size}
 function score(){$('s-exp').textContent=sc.exp+'/'+sc.done;$('s-ok').textContent=sc.ok;$('s-stop').textContent=sc.stop;$('s-wasted').textContent=sc.wasted;$('s-calls').textContent=sc.calls}
 function rows(){$('runres').innerHTML=sc.rows.map(r=>`<div class="res"><span>${esc(r.title)}</span><span class="g">${r.out==='success'?'completed':'stopped'} &middot; ${r.asExpected?'<span style="color:var(--ok)">as expected &#10003;</span>':'<span style="color:var(--bad)">not as expected &#10007;</span>'}</span></div>`).join('')}
 function on(e){
   switch(e.event){
-  case 'run-start': resetScore();$('log').innerHTML='';$('result').className='result';
+  case 'run-start': runNoModel=(e.model==='none');stub=!!e.stub;total=e.total||0;resetScore();prog();$('log').innerHTML='';$('result').className='result';ladderReset();live(true,'Running');
     $('model').textContent='model: '+e.model;$('model').className='badge '+(e.stub?'stub':(e.model==='none'?'':'live'));log(e.t,'run started, model = '+esc(e.model)); break;
-  case 'scene': cur=e;ladderReset();box(null);$('result').className='result';
+  case 'scene': { const sd=scenes.find(x=>x.id===e.id); if(sd) e.expect=(sd.model&&runNoModel)?'stop':sd.expect; } cur=e;$('steps').innerHTML='';ladderReset();box(null);$('result').className='result';prog();
     document.querySelectorAll('.pick').forEach(p=>p.classList.remove('cur'));const pe=$('p-'+e.id);if(pe)pe.classList.add('cur');
-    $('scene').innerHTML=`<h2>Now</h2><span class="pill">test ${e.n} of ${e.total}</span>${expPill(e.expect)}<br><b>${esc(e.title)}</b><p>${esc(e.say)}</p>`;think('Reading the screen...');log(e.t,'<b>'+esc(e.title)+'</b>'); break;
-  case 'intent-start': think(`Goal: <b>${esc(e.goal)}</b><br><span class="conf">Looking at ${e.controls} controls on screen.${e.success?' Success means: '+esc(e.success):''}</span>`); break;
-  case 'route': { const r=e.route;
+    $('sceneInfo').innerHTML=`<span class="pill">test ${e.n} of ${e.total}</span>${expPill(e.expect)}<div class="t">${esc(e.title)}</div><p>${esc(e.say)}</p>`;think('Reading the screen...');log(e.t,'<b>'+esc(e.title)+'</b>'); break;
+  case 'intent-start': { const lf=e.looking_for||{}, keys=Object.keys(lf);
+    const what=keys.length?keys.map(k=>`${k} <q>${esc(lf[k])}</q>`).join(', '):'no hints were taught';
+    think(`Goal: <b>${esc(e.goal)}</b>`,`Taught to look for: ${what}. ${e.controls} controls are on screen${e.onscreen&&e.onscreen.length?': '+e.onscreen.map(esc).join(', ')+(e.controls>e.onscreen.length?', ...':''):''}.${e.success?' Success means: '+esc(e.success):''}`);
+    step('n','&#9679;',`Goal: ${esc(e.goal)}. On screen now: ${(e.onscreen||[]).map(esc).join(', ')||'?'}`); break; }
+  case 'route': { const r=e.route,k=ROUTES.indexOf(r)+1,nm=NAMES[r],q=e.query,ex=(e.examples||[]).map(esc).join(', ');
+    const asks={'resource-id':q?`a control whose <b>id</b> is <q>${esc(q)}</q>`:null,'content-desc':q?`a control whose <b>label</b> is <q>${esc(q)}</q>`:null,'text':q?`a control whose <b>text</b> says <q>${esc(q)}</q>`:null,
+      'scoped':q?`a control inside the container <q>${esc(q)}</q>`:null,'learned':q?'a control it remembered from an earlier run':null,'semantic':null,'geometry':q?`a control at the taught screen position ${esc(q)}`:null}[r];
     if(e.hits===0) rung(r,'skip',r==='semantic'?'no answer':'no match');
     else if(!e.usable) rung(r,'amb',e.hits+' matches: unsure');
     else rung(r,'try',e.hits===1?'1 match':e.hits+' picks');
-    if(r!=='semantic'||e.hits===0) think(e.hits===0?`Way ${ROUTES.indexOf(r)+1}, <b>${NAMES[r]}</b>: finds nothing${r==='semantic'?' (no model, or no answer)':''}.`:(e.usable?`Way ${ROUTES.indexOf(r)+1}, <b>${NAMES[r]}</b>: points at exactly one control.`:`Way ${ROUTES.indexOf(r)+1}, <b>${NAMES[r]}</b>: matches ${e.hits} controls, so it is not trusted.`));
-    log(e.t,`way ${ROUTES.indexOf(r)+1} <b>${NAMES[r]}</b>: ${e.hits} candidate(s)`); break; }
-  case 'model-ask': rung('semantic','try','asking...');think(`The rules cannot read this screen. Asking the model, showing it ${e.options} controls. It may only answer with a number from that list.`);log(e.t,'model asked ('+e.options+' options)'); break;
-  case 'model-answer': if(e.error){think('The model call failed: '+esc(e.error));rung('semantic','lose','failed')}
-    else{const p=e.picks[0];think(p?`The model suggests <b>${esc(p.label)}</b> <span class="conf">(confidence ${p.confidence==null?'?':Math.round(p.confidence*100)+'%'}). Only a suggestion: it will be tapped, then checked.</span>`:'The model named nothing.');
+    if(r!=='semantic'){
+      const what=asks?`Searching for ${asks}`:`Nothing was taught for the <b>${nm}</b> way, so there is nothing to search for`;
+      const out=!asks?'skipped':e.hits===0?'found nothing':(e.usable?`found exactly one: <b>${ex}</b>`:`matched ${e.hits} controls (${ex}): too ambiguous to trust`);
+      think(`Way ${k} of 7, <b>${nm}</b>`,`${what}: ${out}.`);
+      step(!asks?'n':e.hits===0?'x':e.usable?'y':'w',!asks?'&ndash;':e.hits===0?'&#10007;':e.usable?'&#10003;':'?',`Way ${k} <b>${nm}</b>: ${what.replace('Searching for ','looking for ')}. ${out}.`);
+    } else if(e.hits===0){ think(`Way ${k} of 7, <b>${nm}</b>`,'No model is available for this test, or it gave no answer.'); step('x','&#10007;',`Way ${k} <b>model</b>: not available or no answer.`) }
+    log(e.t,`way ${k} <b>${nm}</b>: ${e.hits} candidate(s)`); break; }
+  case 'model-ask': rung('semantic','try','asking...');think(stub?'The rules cannot read this screen. Asking the <b>offline stand-in</b> (word matching, not an AI).':'The rules cannot read this screen. Asking the <b>model</b>.',`It sees ${e.options} controls and may only answer with a number from that list.`);step('w','?',`Way 6 <b>model</b>: sent ${e.options} on-screen controls and the goal${stub?' to the offline stand-in':' to the model'}; it may only answer with a number from that list.`);log(e.t,'model asked ('+e.options+' options)'); break;
+  case 'model-answer': if(e.error){think('The model call failed.',esc(e.error));rung('semantic','lose','failed')}
+    else{const p=e.picks[0];think(p?`${stub?'The stand-in':'The model'} suggests <b>${esc(p.label)}</b>`:'The model named nothing.',p?`${p.confidence==null?'':'Score '+Math.round(p.confidence*100)+'%. '}Only a suggestion: it will be tapped, then checked.`:'');
       rung('semantic',p?'try':'skip',p?e.picks.length+' pick(s)':'nothing')}
-    log(e.t,'model answered: '+esc(JSON.stringify(e.picks.map(p=>p.label)))); break;
-  case 'act': box(e,'tap');window._last=e;think(`Tapping <b>${esc(e.label)}</b> via way <b>${NAMES[e.route.split('[')[0]]}</b>, then checking the next screen.`);rung(e.route.split('[')[0],'try','tapped');log(e.t,'tap '+esc(e.label)); break;
+    {const p=e.picks&&e.picks[0];step(e.error?'x':p?'y':'x',e.error?'&#10007;':p?'&#10003;':'&#10007;',e.error?'Model call failed.':p?`Model suggests <b>${esc(p.label)}</b>${e.picks.length>1?' (and '+(e.picks.length-1)+' backup pick(s))':''}. Only a suggestion until tapped and checked.`:'Model named nothing.')}log(e.t,'model answered: '+esc(JSON.stringify(e.picks.map(p=>p.label)))); break;
+  case 'act': box(e,'tap');window._last=e;think(`Tapping <b>${esc(e.label)}</b>`,`via way <b>${NAMES[e.route.split('[')[0]]}</b>, then checking the next screen.`);step('w','&#9758;',`Tapping <b>${esc(e.label)}</b> (way <b>${NAMES[e.route.split('[')[0]]}</b>), then checking the next screen.`);rung(e.route.split('[')[0],'try','tapped');log(e.t,'tap '+esc(e.label)); break;
   case 'check': { const r=e.route.split('[')[0]; box(window._last,e.ok?'ok':'bad'); rung(r,e.ok?'win':'lose',e.ok?'worked':'no effect');
-    think(e.ok?`&#10003; Check passed${e.says?': '+esc(e.says):''}`:`&#10007; Check failed: the screen did not change as expected. That tap is counted as wrong; trying the next way.`);log(e.t,(e.ok?'check OK':'check FAILED')); break; }
+    think(e.ok?'&#10003; Check passed':'&#10007; Check failed',e.ok?esc(e.says||''):'The screen did not change as expected. That tap counts as wrong; trying the next way.');step(e.ok?'y':'x',e.ok?'&#10003;':'&#10007;',e.ok?`Check passed${e.says?': '+esc(e.says):''}: the screen changed as expected.`:'Check failed: the screen did not change as expected, so that tap counts as wrong.');log(e.t,(e.ok?'check OK':'check FAILED')); break; }
   case 'intent-end': { sc.wasted+=e.wasted;sc.calls+=e.model_calls;const ok=e.outcome==='success';ok?sc.ok++:sc.stop++;sc.done++;
-    const asExp=cur&&((cur.expect==='success')===ok);if(asExp)sc.exp++;sc.rows.push({title:cur?cur.title:'',out:e.outcome,asExpected:asExp});score();rows();box(null);
+    const asExp=cur&&((cur.expect==='success')===ok);if(asExp)sc.exp++;sc.rows.push({title:cur?cur.title:'',out:e.outcome,asExpected:asExp});score();rows();prog();box(null);
     const pe=cur&&$('p-'+cur.id);if(pe){pe.classList.remove('cur');pe.classList.add(asExp?'done-ok':'done-bad')}
     const n=e.detail.replace(/^.*none achieved the goal: /,'').split(', ').length;
+    const viaModel=ok&&e.route.indexOf('semantic')===0;
+    const note=viaModel?(stub?'<span class="note">Solved by the offline stand-in: simple word matching, NOT a language model. Pick a real model in the header to show an AI doing this.</span>':'<span class="note" style="background:rgba(61,220,151,.14);color:var(--ok)">Solved by a real model; its pick was verified by the check.</span>'):'';
     const r=$('result');r.className='result '+(ok?'ok':'stop');
-    r.innerHTML=ok?`&#10003; Done via the <b>${NAMES[e.route.split('[')[0]]}</b> way<small>${e.wasted} wasted tap(s), ${e.model_calls} model call(s). ${asExp?'As expected.':'Not what was expected.'}</small>`
-      :`&#9888; Stopped honestly. Nothing was guessed.<small>Tried all ${n} ways and none found the control, so it told the user instead of tapping at random. ${asExp?'This is the expected result.':'This was NOT expected.'}</small>`;
+    r.innerHTML=ok?`&#10003; Done via the <b>${NAMES[e.route.split('[')[0]]}</b> way<small>${e.wasted} wasted tap(s), ${e.model_calls} model call(s). ${asExp?'As expected.':'Not what was expected.'}</small>${note}`
+      :`&#9888; Stopped honestly. Nothing was guessed.<small>Tried all ${n} ways and none found the control, so it told the user instead of tapping at random.${(scenes.find(x=>x.id===(cur&&cur.id))||{}).model&&runNoModel?' The wording changed and no model was selected, so nothing could read it. Select a model to see this pass.':''} ${asExp?'This is the expected result.':'This was NOT expected.'}</small>`;
     log(e.t,'<b>'+(ok?'success':'stopped honestly')+'</b>'); break; }
-  case 'run-end': log(e.t,'run finished'); think('Run finished.'); break;
+  case 'run-end': log(e.t,'run finished'); think('Run finished.',sc.exp+' of '+sc.done+' tests came out as expected.');live(false,'Idle'); break;
   }
 }
-async function poll(){try{const r=await (await fetch('/events?since='+since)).json();since=r.next;r.events.forEach(on);run=r.running;$('go').disabled=run||!sel.size}catch(e){}setTimeout(poll,350)}
-function shot(){$('scr').src='/screen.png?'+Date.now()}
-$('scr').onload=()=>setTimeout(shot,run?250:1200);$('scr').onerror=()=>setTimeout(shot,2000);
-$('go').onclick=async()=>{since=0;ladderReset();document.querySelectorAll('.pick').forEach(p=>p.classList.remove('done-ok','done-bad','cur'));
-  await fetch(`/start?semantic=${$('sem').value}&pace=${$('pace').value}&scenes=${[...sel].sort().join(',')}`)};
-$('stop').onclick=()=>fetch('/stop');
+let isPaused=false;
+function setPaused(p){isPaused=!!p;$('paused').classList.toggle('on',isPaused);$('pause').disabled=!run;$('pause').innerHTML=isPaused?'&#9654; Resume':'&#10074;&#10074; Pause';$('pause').classList.toggle('pri',isPaused);
+  if(isPaused){$('dot').className='dot hold';$('livetxt').textContent='Paused'}else if(run){$('dot').className='dot on';$('livetxt').textContent='Running'}}
+async function poll(){try{const r=await (await fetch('/events?since='+since)).json();since=r.next;if(r.reset)freshUi();r.events.forEach(on);run=r.running;$('go').disabled=run||!sel.size;setPaused(r.running&&r.paused);if(!r.running&&$('dot').className.indexOf('on')>-1)live(false,'Idle')}catch(e){}setTimeout(poll,350)}
+function shot(){if(document.hidden){setTimeout(shot,2000);return}$('scr').src='/screen.png?'+Date.now()}
+$('scr').onload=()=>setTimeout(shot,run?500:1500);$('scr').onerror=()=>setTimeout(shot,3000);
+function freshUi(){cur=null;$('steps').innerHTML='';ladderReset();box(null);resetScore();total=0;$('prog').innerHTML='';$('result').className='result';$('log').innerHTML='';
+  document.querySelectorAll('.pick').forEach(p=>p.classList.remove('done-ok','done-bad','cur'));
+  $('sceneInfo').innerHTML='<div class="t">Starting...</div><p>Getting the phone to the Settings app.</p>';think('Starting the run.')}
+$('go').onclick=async()=>{freshUi();
+  await fetch(`/start?semantic=${$('sem').value}&pace=${$('pace').value}&scenes=${[...sel].sort().join(',')}`);
+  since=0;freshUi()};
+$('sem').onchange=()=>renderPicks();
+$('pause').onclick=async()=>{await fetch(isPaused?'/resume':'/pause');setPaused(!isPaused)};
+$('stop').onclick=async()=>{await fetch('/stop');setPaused(false)};
 $('all').onclick=()=>{scenes.forEach(s=>sel.add(s.id));renderPicks()};$('none').onclick=()=>{sel.clear();renderPicks()};
-(async()=>{resetScore();ladderReset();
+
+const folded=new Set();try{(JSON.parse(localStorage.getItem('kenna-fold'))||[]).forEach(k=>folded.add(k))}catch(e){}
+const cards=()=>[...document.querySelectorAll('.card[data-k]')];
+function applyFold(){cards().forEach(c=>{const f=folded.has(c.dataset.k);c.classList.toggle('collapsed',f);const h=c.querySelector(':scope>h2');if(h){h.setAttribute('role','button');h.tabIndex=0;h.setAttribute('aria-expanded',String(!f))}});
+  $('fold').textContent=cards().every(c=>c.classList.contains('collapsed'))?'Expand all':'Collapse all';
+  try{localStorage.setItem('kenna-fold',JSON.stringify([...folded]))}catch(e){}}
+function toggleCard(c){const k=c.dataset.k;folded.has(k)?folded.delete(k):folded.add(k);applyFold()}
+document.addEventListener('click',e=>{const h=e.target.closest('.card[data-k]>h2');if(h&&!e.target.closest('button'))toggleCard(h.parentElement)});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.card[data-k]>h2')){e.preventDefault();toggleCard(e.target.parentElement)}});
+$('fold').onclick=()=>{const all=cards().every(c=>c.classList.contains('collapsed'));cards().forEach(c=>all?folded.delete(c.dataset.k):folded.add(c.dataset.k));applyFold()};
+(async()=>{resetScore();ladderReset();applyFold();
   try{scenes=await (await fetch('/scenes')).json()}catch(e){scenes=[]}
   let saved=null;try{saved=JSON.parse(localStorage.getItem('kenna-sel'))}catch(e){}
   sel=new Set((Array.isArray(saved)&&saved.length?saved:scenes.map(s=>s.id)).filter(i=>scenes.some(s=>s.id===i)));

@@ -16,3 +16,8 @@ agent/.env.local
 agent/anthropic.key
 agent/*.key
 path-b/results/*.key
+
+# live dashboard runtime output
+path-b/results/live_events.jsonl
+path-b/results/live_demo.err
+path-b/results/live_pause.flag

@@ -1,4 +1,4 @@
-# NEXT_STEPS - pick the project up from here (updated 2026-10-29, evening)
+# NEXT_STEPS - pick the project up from here (updated 2026-10-29, night)
 
 Read [`../README.md`](../README.md) for what exists, [`../../AGENTS.md`](../../AGENTS.md) for the rules, [`DEFENSE.md`](DEFENSE.md) for claims and evidence,
 [`FYP_MVP_PLAN.md`](FYP_MVP_PLAN.md) section 15 (last entries) for the dated log. This file is only: **what is unfinished, and the exact commands to continue.**
@@ -53,8 +53,13 @@ ANDROID_SDK_ROOT=D:/AndroidSdk ANDROID_AVD_HOME=D:/AndroidSdk/avd D:/AndroidSdk/
 python Kenna/path-b/adb_capture.py devices        # expect emulator-5554  device
 ```
 Stop: `D:/AndroidSdk/platform-tools/adb.exe emu kill`. Add `-no-window` to run headless.
+**Easier, and what to use for a demo:** `powershell -ExecutionPolicy Bypass -File Kenna\path-b\start_emulator.ps1` (kills stale emulator/adb, removes locks, cold boot, waits for boot,
+**software rendering**, centres the window; `-Gpu host|angle_indirect|swiftshader_indirect`, `-NoWindow`). Then `python Kenna/path-b/dashboard.py` and open <http://127.0.0.1:8765>
+(live view: phone, numbered ladder, plain-words narration, pick scenes, pause/resume; see `path-b/README.md`).
 
 **Lessons (each cost time):**
+- **`-gpu host` crashed the AMD graphics driver** (2026-10-29): emulator log *A device attached to the system is not functioning* / Vulkan ColorBuffer failures, the emulator died and Edge showed
+  `msedge.exe ... 0xe0000008`. The start script now defaults to `swiftshader_indirect`. If it happens again: close Edge, rerun `start_emulator.ps1`.
 - `-window-scale` does not exist in this emulator version: the launch fails silently. Put a window on screen yourself; with Windows scaling at 125% the usable area is 1536 x 864, so about 340 x 760 at (1150, 10) fits.
 - **Two `adb` versions kill each other's background server** (every call restarts it and can hang). The tools prefer `D:\AndroidSdk\platform-tools\adb.exe`; do not mix with the old C: copy.
 - **A frozen guest** (every `adb shell` hangs, though `adb devices` still lists it) happens after repeated reboots or a language switch. Fix: kill `emulator`, `qemu-system-x86_64` and `adb`, delete `D:\AndroidSdk\avd\kenna.avd\*.lock`, relaunch with `-no-snapshot-load`.
@@ -67,6 +72,10 @@ Stop: `D:/AndroidSdk/platform-tools/adb.exe emu kill`. Add `-no-window` to run h
   inside a clickable row count, **2% are nameless** (the way TalkBack names a row). `hierdump.py` reports both; quote the name-aware figure and say which you mean.
 - Real row names are "title subtitle" ("Network & internet Mobile, Wi-Fi, hotspot"), so the text route also accepts a leading-title match (still unique-only). On Android 34 an empty field's placeholder is its `text`, not a `hint`.
 - `live_suite.py` (stale hints = simulated drift) and `live_drift.py` (real drift: French, font 1.6) with the real model are published in `../results/published/android_qual_qwen37flash/`.
+
+### Live dashboard (built 2026-10-29)
+`path-b/dashboard.py` + `dashboard.html` + `live_demo.py` (five selectable scenes, expected results follow the model menu, pause/resume, plain-words narration; the offline stand-in is labelled not-an-AI).
+Run offline only so far; **to do before the defense: run it once with `--semantic openrouter` (menu: OpenRouter) so scene 2 is a real-model result, and rehearse with the emulator on software rendering.**
 
 ### Still to do on Android
 1. **Scrolling.** With a large font two rows fall below the fold and no arm scrolls (8/10 for every arm). Add a scroll step to the layer (the accessibility tree says which container scrolls).

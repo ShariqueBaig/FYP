@@ -49,6 +49,9 @@ node Kenna/agent/fyp.mjs run --breaks B8
 Steps 3-5 reuse the qualification's cached answers, so they work with no network. With no cache and no key, use `--semantic offline` and **say aloud that the model is a stand-in**
 (the mechanism is the same; the quality of the model's choices is not).
 Android (emulator running, see `NEXT_STEPS.md` section 2): `python Kenna/path-b/live_smoke.py --semantic openrouter`.
+**Better for an audience:** the live dashboard. `powershell -ExecutionPolicy Bypass -File Kenna\path-b\start_emulator.ps1`, then `python Kenna/path-b/dashboard.py`, open <http://127.0.0.1:8765>.
+Run scenes 2 and 5 with **No model** (both stop honestly), then scene 2 with a real model (OpenRouter) to show it complete; pause/resume to talk over a step. Say aloud that the *offline stand-in* is
+word matching, not an AI, and use only real-model runs as evidence.
 Record a backup video of steps 1-3 before the defense in case the live demo fails.
 
 ## Questions you should expect

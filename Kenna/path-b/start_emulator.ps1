@@ -2,7 +2,7 @@
 #   powershell -ExecutionPolicy Bypass -File Kenna\path-b\start_emulator.ps1 [-Gpu host|angle_indirect|swiftshader_indirect] [-NoWindow]
 # Kills a stale/frozen emulator, removes lock files, boots fresh (no snapshot), waits for boot, centres the window.
 param(
-  [string]$Gpu = 'host',
+  [string]$Gpu = 'swiftshader_indirect',   # 'host' crashed the AMD driver on this laptop (took Edge down with it); use it only if stable
   [switch]$NoWindow
 )
 $ErrorActionPreference = 'Continue'

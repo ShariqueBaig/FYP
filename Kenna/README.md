@@ -120,6 +120,8 @@ python Kenna/tools/check_links.py                  # every relative link in ever
 ## 9. Android emulator (this laptop)
 SDK at `D:\AndroidSdk` (outside OneDrive), virtual device `kenna` (Android 34, Google APIs). Setup, start/stop commands, the findings from the first
 real dumps and the freeze/recovery lessons are in [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md) section 3b. Only stock Settings has been tested.
+**Demo it with the live dashboard:** `powershell -ExecutionPolicy Bypass -File Kenna\path-b\start_emulator.ps1` (clean start, software rendering, window centred), then
+`python Kenna/path-b/dashboard.py` and open <http://127.0.0.1:8765> (pick tests, Run, Pause/Resume; details in [`path-b/README.md`](path-b/README.md)).
 
 ## 10. Credentials (live app only) and hosting
 ```bash

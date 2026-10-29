@@ -45,6 +45,7 @@ Firebase and no `node_modules` for the app.
 | `experiment --arms baseline,healed,llm-only,model-verified,hybrid`, `--set semantic\|inject\|vision` | arms and drift sets; `inject` plants instructions in labels (B11); `vision` removes all words (with `--semantic-shot`, screenshot + numbered badges) |
 | `--semantic openrouter [--semantic-model id]` | OpenAI-format models via OpenRouter (key: `OPENROUTER_API_KEY` or `agent/openrouter.key`). **A run with `valid:false` had model calls fail: never quote it** |
 | `node agent/report.mjs <dir> [--publish name]` / `bash agent/run_protocol.sh` | CI tables + manifest from raw logs; resumable real-model protocol |
+| `python Kenna/path-b/dashboard.py` | **Android live dashboard** at <http://127.0.0.1:8765> (needs the emulator: `powershell -ExecutionPolicy Bypass -File Kenna\path-b\start_emulator.ps1`): pick scenes, run, pause/resume; the expected result follows the model menu; the offline stand-in is labelled "not an AI". Not for agents to drive: a human demo view |
 | `login` / `run --login` | live app only: sign in with the vault login, then (for `run`) do the flow. Use `--live --url <site>` |
 | `vault status\|set\|clear` | where the live login is kept. `set` is typed by the human, never by an agent. Status never prints the password |
 
@@ -59,7 +60,7 @@ Each folder has its own `README.md`. Code folders keep their paths (many scripts
 | `Kenna/README.md` | entry page: what it is, folder map, evidence at a glance, commands, keys, tests | yes (keep current) |
 | `Kenna/fyp-mvp/harness.js` | **the product**: intents, ladder, breaks B1-B11, scoring, agent API (`window.__FYP_AGENT`, section 12) | yes - source of truth; the runner serves it live |
 | `Kenna/agent/` | command line, model bridge (`semantic.mjs`), reports (`report.mjs`), protocol scripts, Momo contract, tests | yes |
-| `Kenna/path-b/` | Android: `adb_capture.py` (adb parser), `android_layer.py` (ladder + model rung), live emulator tests, `hierdump.py` (coverage). Run live on the `kenna` emulator (SDK at `D:\AndroidSdk`) against stock Settings only. `live_dumper.py` / `intent_route_layer.py` are the old scaffold | yes |
+| `Kenna/path-b/` | Android: `adb_capture.py` (adb parser), `android_layer.py` (ladder + model rung), live emulator tests, `hierdump.py` (coverage). Run live on the `kenna` emulator (SDK at `D:\AndroidSdk`) against stock Settings only; `dashboard.py` + `live_demo.py` + `start_emulator.ps1` are the demo view. `live_dumper.py` / `intent_route_layer.py` are the old scaffold | yes |
 | `Kenna/results/published/` | **committed evidence** (manifest + report + raw log per experiment); `agent/results/` is git-ignored working output; `path-b/results/` holds old stub-model Android runs (tracked, not citable as model results) | add via `report.mjs --publish` |
 | `Kenna/docs/` | `DEFENSE.md`, `NEXT_STEPS.md`, `FYP_MVP_PLAN.md` (append to section 15), `SYNTHIE.md`, `PATH_B_GUIDE.md`, the original briefing | yes |
 | `Kenna/tools/check_links.py` | every relative link and repo path in the markdown must resolve | run after moving or renaming a file |
