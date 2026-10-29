@@ -441,13 +441,18 @@
       screen: 'caption',
       action: 'click',
       desc: 'Publish the post',
+      // Outward-facing and not undoable: a model's guess is acted on only when it
+      // is confident, and only its first choice (see route_semantic).
+      irreversible: true,
       testId: 'share-button',
       labels: ['share'],
       anchor: 'More options',
       region: 'sticky-bottom',
       ordinal: 0,
-      success: () => detectScreen() === 1,
-      successDesc: 'returned to the feed',
+      // Not just "back on the feed": any tap that abandons the draft also lands there.
+      // The step's own goal is the post being published, so the predicate says so.
+      success: () => detectScreen() === 1 && bodyText().includes(CAPTION_TEXT),
+      successDesc: 'returned to the feed with the new post in it',
     },
     {
       id: 'feed.assert',
@@ -668,13 +673,106 @@
     try { route_vision(intent, cs); intent._poolSize = lastPoolLen || keep; } catch (e) { intent._poolSize = keep; }
   }
 
+  // -------------------------------------------------------------------------
+  // Route 5 - learned. A deterministic locator DISTILLED from an earlier
+  // semantic (model) success: what the control was called, what it said, and
+  // where it sat, with no hook in it (hooks are what drift). Only present when
+  // route memory is on. It is cheap, so a model is asked once per change of UI
+  // rather than once per run.
+  // -------------------------------------------------------------------------
+  const appColumn = () => { const W = Math.min(innerWidth, 500); return { W, off: (innerWidth - W) / 2 }; };
+
+  function descriptorOf(c) {
+    const { W, off } = appColumn();
+    return {
+      tag: c.tag, label: c.label || '', text: c.text || '',
+      geo: { x: (c.box.cx - off) / W, y: c.box.cy / innerHeight, docY: docPos(c.el).y, w: c.box.w, h: c.box.h },
+    };
+  }
+
+  const route_learned = (intent, cs) => {
+    const rec = memory.enabled ? memory.intents[intent.id] : null;
+    const d = rec && rec.learned;
+    if (!d) return [];
+    const same = cs.filter((c) => c.tag === d.tag);
+    const named = same.filter((c) => (d.label && c.label === d.label) || (d.text && d.text.length > 1 && c.text === d.text));
+    if (named.length === 1) return named;
+    const { W, off } = appColumn();
+    const tx = off + d.geo.x * W;
+    const pool = (named.length ? named : same)
+      .filter((c) => c.box.w > d.geo.w * 0.6 && c.box.w < d.geo.w * 1.6 && c.box.h > d.geo.h * 0.6 && c.box.h < d.geo.h * 1.6)
+      .map((c) => ({ c, d: Math.hypot(c.box.cx - tx, d.geo.docY == null ? c.box.cy - d.geo.y * innerHeight : docPos(c.el).y - d.geo.docY) }))
+      .sort((a, b) => a.d - b.d);
+    return pool.length && pool[0].d <= (d.geo.docY == null ? innerHeight * 0.15 : 90) ? [pool[0].c] : [];
+  };
+
+  // -------------------------------------------------------------------------
+  // Route 6 - semantic. Asks a model which control means this intent. The model
+  // lives OUTSIDE the page (the runner exposes window.__fypSemantic), so the
+  // harness stays dependency-free and the model is swappable.
+  //
+  // What the model is and is not trusted with:
+  //   * it sees a compact list of the controls on screen (no hooks, no caption
+  //     text) and can only answer with INDICES into that list - it cannot invent
+  //     a control, and text on the page cannot make it click anything off-list;
+  //   * its answer is only a CANDIDATE: the same act-then-check-the-predicate
+  //     loop that judges every other route judges this one;
+  //   * an irreversible intent (publishing) is acted on only when the model is
+  //     confident, and only on its first choice.
+  // -------------------------------------------------------------------------
+  const semantic = { enabled: false, calls: 0, errors: 0, ms: 0, inTok: 0, outTok: 0, cached: 0, provider: '' };
+  const SEMANTIC_TOP = 3;
+  const SEMANTIC_MIN_CONFIDENCE_IRREVERSIBLE = 0.8;
+
+  async function askModel(intent, cs) {
+    if (typeof window.__fypSemantic !== 'function') return [];
+    const { W, off } = appColumn();
+    const r2 = (n) => Math.round(n * 100) / 100;
+    const payload = {
+      intent: { id: intent.id, desc: intent.desc, action: intent.action, success: intent.successDesc || '', hasText: intent.action === 'type' },
+      screen: SCREEN_NAME[detectScreen()],
+      pageText: bodyText().slice(0, 300),
+      // On-screen controls first (a screen's own controls can sit after dozens of feed
+      // items in the DOM, behind it), then the rest; `i` stays the index into `cs`.
+      controls: cs.map((c, i) => ({
+        i, tag: c.tag, role: c.role, label: c.label, text: (c.text || '').slice(0, 60),
+        placeholder: c.el.getAttribute('placeholder') || '',
+        x: r2((c.box.cx - off) / W), y: r2(c.box.cy / innerHeight), w: Math.round(c.box.w), h: Math.round(c.box.h),
+        onScreen: c.box.cy >= 0 && c.box.cy <= innerHeight && c.box.cx >= 0 && c.box.cx <= innerWidth,
+      })).sort((a, b) => (b.onScreen - a.onScreen) || (a.i - b.i)).slice(0, 60),
+    };
+    const t0 = now();
+    let res;
+    try { res = await window.__fypSemantic(payload); } catch (e) { semantic.errors++; return []; }
+    semantic.calls++;
+    semantic.ms += now() - t0;
+    if (res && res.usage) { semantic.inTok += res.usage.inputTokens || 0; semantic.outTok += res.usage.outputTokens || 0; if (res.usage.cached) semantic.cached++; }
+    if (res && res.provider) semantic.provider = res.provider;
+    return ((res && res.ranked) || [])
+      .filter((r) => r && Number.isInteger(r.i) && cs[r.i])
+      .map((r) => ({ c: cs[r.i], conf: typeof r.confidence === 'number' ? r.confidence : 0.5 }));
+  }
+
+  async function route_semantic(intent, cs) {
+    if (!semantic.enabled) return [];
+    let picks = await askModel(intent, cs);
+    if (intent.irreversible) picks = picks.slice(0, 1).filter((p) => p.conf >= SEMANTIC_MIN_CONFIDENCE_IRREVERSIBLE);
+    return picks.slice(0, SEMANTIC_TOP).map((p) => p.c);
+  }
+
   const ROUTES = [
     { name: 'id', grade: GRADES.id, run: route_id },
     { name: 'label', grade: GRADES.label, run: route_label },
     { name: 'text', grade: GRADES.text, run: route_text },
     { name: 'scoped', grade: GRADES.scoped, run: route_scoped },
+    // Both only exist when asked for (route memory / a model). They sit BEFORE geometry:
+    // a blind positional guess is the weakest rung, and a wrong tap can change the
+    // screen under the flow, so a verified answer from memory or a model goes first.
+    { name: 'learned', grade: 'C', run: route_learned },
+    { name: 'semantic', grade: 'C', run: route_semantic, async: true },
     { name: 'vision', grade: GRADES.vision, run: route_vision },
   ];
+  const LEARNED_IX = ROUTES.findIndex((r) => r.name === 'learned');
 
   /**
    * Resolve one intent against a snapshot. Walks the ladder and returns the
@@ -685,6 +783,7 @@
     const tried = [];
     for (let i = 0; i < ROUTES.length; i++) {
       const route = ROUTES[i];
+      if (route.async || route.name === 'learned') continue;   // need a model / memory: runIntentCore only
       let hits = [];
       try {
         hits = route.run(intent, cs) || [];
@@ -894,6 +993,7 @@
     ctx: { rep: null }, // set by the N-times experiment
     exp: { active: false, stop: false, rep: 0, n: 0, label: '' },
     survey: null, // per-screen accessibility measurement
+    armLabel: null, // set by the experiment for arms that reuse runHealed (hybrid)
   };
 
   // Live breadcrumb: which intent / route / candidate is running. A setter, so
@@ -912,6 +1012,7 @@
     // writing the script. Logging it would double every row in the scoreboard.
     if (state.recording) return row;
     row.timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    if (state.armLabel && !row.arm) row.arm = state.armLabel;   // experiment arms beyond baseline / healed
     row.run = state.runId;
     row.rep = state.ctx.rep;
     row.config = Object.keys(state.chaos.active).sort().join('+') || 'clean';
@@ -997,15 +1098,25 @@
     const plan = memoryPlan(intent, sig);
     const failedNow = new Set();   // routes acted on this time that had no effect
     const skipped = [];            // routes not tried because memory says they were wrong here
-    const learn = (routeIndex) => memoryRecord(intent, sig, plan, routeIndex, wastedOf(attempts), failedNow);
-    const memFields = () => ({ failedActions: wastedOf(attempts), memory: memory.enabled ? memoryNote(plan, skipped) : '' });
+    // A semantic (model) win is DISTILLED: remembered as a 'learned' route, so the
+    // next run resolves it from memory instead of asking the model again.
+    const learn = (routeIndex, ctl) => {
+      const viaModel = ROUTES[routeIndex].name === 'semantic' || ROUTES[routeIndex].name === 'learned';
+      const distil = memory.enabled && viaModel && ctl;
+      memoryRecord(intent, sig, plan, distil ? LEARNED_IX : routeIndex, wastedOf(attempts), failedNow);
+      if (distil) memory.intents[intent.id].learned = descriptorOf(ctl);
+    };
+    const semCalls0 = semantic.calls;
+    const memFields = () => ({ failedActions: wastedOf(attempts), semanticCalls: semantic.calls - semCalls0, memory: memory.enabled ? memoryNote(plan, skipped) : '' });
 
     for (const i of plan.order) {
       const route = ROUTES[i];
       if (plan.avoid.has(i)) { skipped.push(route.name); continue; }
+      if (route.name === 'learned' && !(memory.enabled && memory.intents[intent.id] && memory.intents[intent.id].learned)) continue;
+      if (route.async && !semantic.enabled) continue;
       let hits = [];
       try {
-        hits = route.run(intent, csNow) || [];
+        hits = (route.async ? await route.run(intent, csNow) : route.run(intent, csNow)) || [];
       } catch (e) {
         hits = [];
       }
@@ -1015,8 +1126,8 @@
       // order until the goal is met - not to commit to one blind guess. This is the
       // "screen-graph neighbourhood search" idea from the source material.
       let candidates;
-      if (route.name === 'vision' && intent.visionSweep) {
-        candidates = hits.slice(0, 12);
+      if ((route.name === 'vision' && intent.visionSweep) || route.name === 'semantic') {
+        candidates = hits.slice(0, route.name === 'semantic' ? SEMANTIC_TOP : 12);
         if (!candidates.length) {
           attempts.push(route.name + '(0)');
           continue;
@@ -1077,7 +1188,7 @@
             await sleep(450);
             await settle(8, 120);
             if (await waitFor(() => intent.success(intent), 900)) {
-              learn(i);
+              learn(i, c);
               return logRow({
                 intent: intent.id,
                 routeIndex: i,
@@ -1101,7 +1212,7 @@
         const ok = await waitFor(() => intent.success(intent), i === 0 && !multi ? 1600 : 900);
 
         if (ok) {
-          learn(i);
+          learn(i, c);
           return logRow({
             intent: intent.id,
             routeIndex: i,
@@ -1220,6 +1331,7 @@
       const sel = state.baseline[intent.id];
       let outcome = 'success';
       let detail = 'the stored locator resolved';
+      let effectSeen = null;   // measurement only: did the step's goal actually hold afterwards?
       try {
         if (!sel) {
           // An assert step has no locator to record. Say that plainly rather than
@@ -1237,9 +1349,12 @@
         // would fail on the HEALTHY app for a reason unrelated to the thesis.
         if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'center' });
         await sleep(300);
+        if (typeof intent.capture === 'function') intent._before = intent.capture();
+        intent._acted = el;
         if (intent.action === 'type') typeInto(el, intent.value);
         else realClick(el);
         await sleep(500);
+        if (intent.action !== 'assert') { try { effectSeen = !!intent.success(intent); } catch (e) { effectSeen = false; } }
       } catch (e) {
         outcome = 'failed-not-found';
         const m = String((e && e.message) || e);
@@ -1257,6 +1372,7 @@
           route: 'hard-coded',
           grade: 'F',
           outcome,
+          effectSeen,
           detail,
           ms: Math.round(now() - t0),
           order: i + 1,
@@ -1264,6 +1380,70 @@
       );
     }
     state.runs.baseline = { ok, total: INTENTS.length, stopped: halted };
+    state.prog = '';
+    running = false;
+    render();
+  }
+
+  /**
+   * The comparison arm for "just ask the model": the model picks a control for each
+   * step, the harness acts on its FIRST choice, and that is all. No uniqueness test,
+   * no fallback routes, no checking the goal and no stopping when it was not met -
+   * which is how a bare LLM agent behaves. The goal predicate is evaluated AFTER the
+   * action purely to measure how often that went wrong; the arm cannot see it.
+   * outcome 'failed-silent' = the action ran, nothing happened, and the arm carried on.
+   */
+  async function runLlmOnly() {
+    if (running) return;
+    running = true;
+    state.runId++;
+    state.runs.llmOnly = null;
+    if (!state.exp.active) state.stop = false;
+    render();
+    const armed = Object.keys(state.chaos.active);
+    await resetApp();
+    for (const k of armed) applyBreak(k);
+    const prevEnabled = semantic.enabled;
+    semantic.enabled = true;
+    let ok = 0, halted = false;
+    try {
+      for (let i = 0; i < INTENTS.length; i++) {
+        if (stopped()) { halted = true; break; }
+        const intent = INTENTS[i];
+        state.prog = 'llm-only · ' + intent.id;
+        const t0 = now();
+        const calls0 = semantic.calls;
+        let outcome = 'success', detail = 'the model chose a control and it was acted on', effectSeen = null;
+        try {
+          if (intent.action === 'assert') {
+            effectSeen = !!(await waitFor(() => intent.success(intent), 1500));
+            outcome = effectSeen ? 'success' : 'failed-predicate';
+            detail = effectSeen ? intent.successDesc : 'caption not found in the feed';
+          } else {
+            const cs = await settle();
+            if (typeof intent.capture === 'function') intent._before = intent.capture();
+            const first = (await askModel(intent, cs))[0];   // a bare agent has no confidence gate
+            const pick = first && first.c;
+            if (!pick) throw new Error('the model named no control');
+            await reveal({ el: pick.el });
+            intent._acted = pick.el;
+            if (intent.action === 'type') typeInto(pick.el, intent.value); else realClick(pick.el);
+            await sleep(500);
+            await settle(8, 120);
+            effectSeen = !!(await waitFor(() => intent.success(intent), 600));
+            if (!effectSeen) { outcome = 'failed-silent'; detail = 'acted on the model\'s first choice; the goal did not hold and the arm did not notice'; }
+          }
+        } catch (e) {
+          outcome = 'failed-absent';
+          detail = String((e && e.message) || e);
+        }
+        if (outcome === 'success') ok++;
+        logRow({ arm: 'llm-only', intent: intent.id, routeIndex: -1, route: 'model-first-choice', grade: 'C', outcome, effectSeen, detail, ms: Math.round(now() - t0), order: i + 1, failedActions: outcome === 'failed-silent' ? 1 : 0, semanticCalls: semantic.calls - calls0 });
+      }
+    } finally {
+      semantic.enabled = prevEnabled;
+    }
+    state.runs.llmOnly = { ok, total: INTENTS.length, stopped: halted };
     state.prog = '';
     running = false;
     render();
@@ -1495,12 +1675,23 @@
   // ===========================================================================
   // 8. Chaos - the seven breaks, each mapping to a failure class
   // ===========================================================================
+  // B9: a control's own words are replaced by synonyms (a copy rewrite / reskin). The
+  // meaning is the same, no word is shared, so label/text routes cannot match.
+  const COPY_REWRITE = {
+    'next': 'Continue', 'share': 'Publish', 'more options': 'Advanced settings', 'back': 'Return',
+    'add ai label': 'Mark as AI-made', 'create post': 'Start something', 'new post': 'Start something',
+    'create': 'Start something', 'add a caption': 'Write something', 'caption': 'Write something',
+    'gallery photo': 'picture',
+  };
+  const rotCopy = new Map();   // node/element -> [kind, original]
+
   function controlAtScreenNext() {
     const s = detectScreen();
     const cs = collect();
     // Hook first, then a hook-free fallback: B1 renames every hook, and a break
     // that cannot find its target would silently do nothing.
-    const byText = (t, region) => cs.find((c) => c.text.toLowerCase() === t && inRegion(c, region));
+    // B9 rewrites button copy, so look for the reworded text as well as the original.
+    const byText = (t, region) => cs.find((c) => [t, COPY_REWRITE[t] && COPY_REWRITE[t].toLowerCase()].includes(c.text.toLowerCase()) && inRegion(c, region));
     if (s === 1) return cs.find((c) => c.hook === 'tab-create') || cs.filter((c) => inRegion(c, 'bottom-nav')).sort((a, b) => a.box.cx - b.box.cx)[2];
     if (s === 2) return cs.find((c) => c.hook === 'compose-next') || byText('next', 'header-right');
     if (s === 3) return cs.find((c) => c.hook === 'share-button') || byText('share', 'sticky-bottom');
@@ -1678,6 +1869,66 @@
         layer.style.pointerEvents = 'none';
         layer.appendChild(cover);
         return () => { layer.innerHTML = ''; };
+      },
+    },
+    'B9': {
+      label: 'B9 · reword every control',
+      note: 'Copy rewrite / reskin: every control keeps its meaning but loses its words (Next -> Continue, Share -> Publish). Label and text routes cannot match; only something that understands meaning can. Alone, the id route still heals it - combine with B1.',
+      persistent: true,
+      apply() {
+        const swap = (s) => {
+          const k = strip(s).toLowerCase();
+          return COPY_REWRITE[k] !== undefined ? COPY_REWRITE[k] : null;
+        };
+        for (const c of collect()) {
+          const el = c.el;
+          for (const attr of ['aria-label', 'placeholder']) {
+            const v = el.getAttribute(attr);
+            const to = v && swap(v);
+            if (to) { rotCopy.set(el, [...(rotCopy.get(el) || []), ['attr', attr, v]]); el.setAttribute(attr, to); }
+          }
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          let n;
+          while ((n = walker.nextNode())) {
+            const to = swap(n.nodeValue || '');
+            if (to) { rotCopy.set(n, [['text', null, n.nodeValue]]); n.nodeValue = to; }
+          }
+        }
+        return () => {
+          for (const [node, list] of rotCopy) {
+            for (const [kind, attr, v] of list) { try { if (kind === 'attr') node.setAttribute(attr, v); else node.nodeValue = v; } catch (e) {} }
+          }
+          rotCopy.clear();
+        };
+      },
+    },
+    'B10': {
+      label: 'B10 · relocate the control',
+      note: 'The control keeps working but moves out of its region (a redesign). Geometry priors and ordinals now point at a neighbour. Follows you to each screen.',
+      perScreen: true,
+      apply() {
+        const c = controlAtScreenNext();
+        if (!c) return null;
+        const el = c.el;
+        const saved = el.getAttribute('style');
+        el.style.position = 'fixed';
+        el.style.left = '6%';
+        el.style.top = '36%';
+        el.style.width = c.box.w + 'px';
+        el.style.height = c.box.h + 'px';
+        el.style.zIndex = '9000';
+        // A fixed child still paints inside its ancestors' stacking contexts, so a lower-z
+        // header would leave it under the screen's other content (measured: the tap was
+        // covered). Lift those ancestors for the break, and put them back on undo.
+        const lifted = [];
+        for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+          const cs = getComputedStyle(a);
+          if (cs.position !== 'static' || cs.zIndex !== 'auto') { lifted.push([a, a.style.zIndex]); a.style.zIndex = '9000'; }
+        }
+        return () => {
+          lifted.forEach(([a, z]) => { a.style.zIndex = z; });
+          if (saved == null) el.removeAttribute('style'); else el.setAttribute('style', saved);
+        };
       },
     },
     'B8': {
@@ -1864,7 +2115,20 @@
   // ===========================================================================
   // 9c. Results: summary table, CSV export, and the N-times experiment
   // ===========================================================================
-  const CSV_COLS = ['timestamp', 'arm', 'config', 'rep', 'run', 'order', 'intent_id', 'route_index', 'route_name', 'grade', 'outcome', 'diagnosis', 'outcome_detail', 'ms_elapsed', 'tree_hash', 'failed_actions', 'memory'];
+  const CSV_COLS = ['timestamp', 'arm', 'config', 'rep', 'run', 'order', 'intent_id', 'route_index', 'route_name', 'grade', 'outcome', 'diagnosis', 'outcome_detail', 'ms_elapsed', 'tree_hash', 'failed_actions', 'memory', 'semantic_calls', 'effect_seen'];
+
+  /**
+   * A "wrong action" is an action that ran and did not achieve the step's goal.
+   * `silent` ones are the dangerous kind: the arm did not notice and carried on
+   * (the model-only arm, and the recorded-locator baseline whose click landed on
+   * something else). A healed arm's wrong actions are caught by the predicate and
+   * recovered from, so they cost time but never end up as a false success.
+   */
+  const wrongOf = (r) => {
+    if (r.outcome === 'failed-silent') return { wrong: 1, silent: 1 };
+    if (r.arm === 'baseline') return r.outcome === 'success' && r.effectSeen === false ? { wrong: 1, silent: 1 } : { wrong: 0, silent: 0 };
+    return { wrong: r.failedActions || 0, silent: 0 };
+  };
 
   /** The suppression class a failure points at (plan section 6.3). */
   function diagnosis(r) {
@@ -1890,6 +2154,7 @@
         r.timestamp, r.arm || 'healed', r.config, r.rep == null ? '' : r.rep, r.run, r.order,
         r.intent, r.routeIndex, r.route, r.grade, r.outcome, diagnosis(r), r.detail, r.ms, r.tree,
         r.failedActions == null ? '' : r.failedActions, r.memory || '',
+        r.semanticCalls == null ? '' : r.semanticCalls, r.effectSeen == null ? '' : r.effectSeen,
       ].map(csvCell).join(','));
     }
     return lines.join('\n');
@@ -1907,7 +2172,9 @@
     for (const r of state.log) {
       const arm = r.arm || 'healed';
       const key = (r.config || 'clean') + '|' + arm + '|' + r.run;
-      const e = (runs[key] = runs[key] || { config: r.config || 'clean', arm, ok: 0, actionsOk: 0 });
+      const e = (runs[key] = runs[key] || { config: r.config || 'clean', arm, ok: 0, actionsOk: 0, wrong: 0, silent: 0, sem: 0, ms: 0 });
+      const w = wrongOf(r);
+      e.wrong += w.wrong; e.silent += w.silent; e.sem += r.semanticCalls || 0; e.ms += r.ms || 0;
       if (r.outcome === 'success') {
         e.ok++;
         if (actionIds.indexOf(r.intent) >= 0) e.actionsOk++;
@@ -1916,18 +2183,20 @@
     const agg = {};
     for (const e of Object.values(runs)) {
       const k = e.config + '|' + e.arm;
-      const a = (agg[k] = agg[k] || { config: e.config, arm: e.arm, runs: 0, steps: 0, full: 0, total });
+      const a = (agg[k] = agg[k] || { config: e.config, arm: e.arm, runs: 0, steps: 0, full: 0, total, wrong: 0, silent: 0, semanticCalls: 0, ms: 0 });
       a.runs++;
       a.steps += e.ok;
+      a.wrong += e.wrong; a.silent += e.silent; a.semanticCalls += e.sem; a.ms += e.ms;
       if (e.actionsOk === actionIds.length) a.full++;
     }
     return Object.values(agg).sort((x, y) => (x.config === y.config ? (x.arm < y.arm ? -1 : 1) : x.config.length - y.config.length || (x.config < y.config ? -1 : 1)));
   }
 
   function summaryCsv() {
-    const lines = ['config,arm,runs,mean_steps_ok,steps_total,flow_completed_runs,flow_completed_pct'];
+    const lines = ['config,arm,runs,mean_steps_ok,steps_total,flow_completed_runs,flow_completed_pct,wrong_actions_per_run,silent_wrong_per_run,semantic_calls_per_run,mean_ms_per_run'];
     for (const a of summarise()) {
-      lines.push([a.config, a.arm, a.runs, (a.steps / a.runs).toFixed(2), a.total, a.full, Math.round((100 * a.full) / a.runs)].map(csvCell).join(','));
+      lines.push([a.config, a.arm, a.runs, (a.steps / a.runs).toFixed(2), a.total, a.full, Math.round((100 * a.full) / a.runs),
+        (a.wrong / a.runs).toFixed(2), (a.silent / a.runs).toFixed(2), (a.semanticCalls / a.runs).toFixed(2), Math.round(a.ms / a.runs)].map(csvCell).join(','));
     }
     return lines.join('\n');
   }
@@ -1947,12 +2216,23 @@
   const PRESETS = {
     full: [[], ['B1'], ['B2'], ['B3'], ['B4'], ['B5'], ['B6'], ['B7'], ['B8'], ['B1', 'B2', 'B3', 'B4'], ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'], ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8']],
     demo: [[], ['B1'], ['B4'], ['B6'], ['B7'], ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8']],
+    // Drift the rules cannot read: the words change (B9), the ids rot (B1), the layout moves (B10).
+    semantic: [[], ['B9'], ['B1', 'B9'], ['B1', 'B9', 'B10'], ['B1', 'B2', 'B9', 'B10']],
+  };
+
+  /** Arms an experiment can run. baseline/healed are the originals; the rest need a model. */
+  const ARM_RUNNERS = {
+    'baseline': { run: () => runBaseline(), semantic: false },
+    'healed': { run: () => runHealed(), semantic: false },
+    'llm-only': { run: () => runLlmOnly(), semantic: true },
+    'hybrid': { run: () => runHealed(), semantic: true, label: 'hybrid' },
   };
 
   /** Both arms, N times, over a set of break configurations. */
-  async function runExperiment(n, which) {
+  async function runExperiment(n, which, arms) {
     if (running || state.exp.active) return;
     const presets = PRESETS[which] || PRESETS.demo;
+    const armList = (arms && arms.length ? arms : ['baseline', 'healed']).filter((a) => ARM_RUNNERS[a]);
     state.exp = { active: true, stop: false, rep: 0, n, label: '' };
     try {
       for (let r = 1; r <= n && !state.exp.stop; r++) {
@@ -1960,15 +2240,21 @@
         state.ctx.rep = r;
         for (const preset of presets) {
           if (state.exp.stop) break;
-          state.exp.label = (preset.join('+') || 'clean') + ' &middot; baseline then healed';
+          state.exp.label = (preset.join('+') || 'clean') + ' &middot; ' + armList.join(' then ');
           render();
           await resetApp();
           preset.forEach((k) => applyBreak(k));
-          await runBaseline();
-          await runHealed();
+          for (const a of armList) {
+            const A = ARM_RUNNERS[a];
+            const prev = semantic.enabled;
+            semantic.enabled = A.semantic;
+            state.armLabel = A.label || null;
+            try { await A.run(); } finally { semantic.enabled = prev; state.armLabel = null; }
+          }
         }
       }
     } finally {
+      state.armLabel = null;
       state.ctx.rep = null;
       state.exp.active = false;
       state.exp.stop = false;
@@ -3007,14 +3293,56 @@
     return { ok: true, routine, warnings: teach.warnings, readback: routine.steps.map((s) => s.n + '. ' + s.desc + ' - done when ' + s.check) };
   }
 
+  /**
+   * Model-assisted success checks for a taught routine. The recorder keeps every change it saw
+   * after a tap, so a check can include incidental ones (a count, an unrelated line that happened
+   * to load). Ask the model which of the OBSERVED changes actually show the goal was reached.
+   *
+   *   * it can only point at items already in the evidence list - it cannot add a condition;
+   *   * the result is a SUGGESTION stored beside the original (step.suggested), never applied
+   *     unless the human replays with useSuggested, so a model can never silently weaken a check;
+   *   * a step with fewer than two observed items, or a model that names none, is left alone.
+   */
+  async function teachSuggest(routine, phrase) {
+    if (!routine || !Array.isArray(routine.steps)) return { ok: false, error: 'bad-routine', userMessage: 'That routine is missing or damaged.' };
+    if (typeof window.__fypSemantic !== 'function') return { ok: false, error: 'no-model', userMessage: 'No model is attached: add --semantic offline or --semantic anthropic.' };
+    const out = [];
+    for (const step of routine.steps) {
+      const ev = step.evidence;
+      const items = [];
+      if (ev && !ev.typed) {
+        (ev.ctl || []).forEach((v) => items.push({ kind: 'control', field: 'ctl', value: v }));
+        (ev.appeared || []).forEach((v) => items.push({ kind: 'text-appeared', field: 'appeared', value: v }));
+        (ev.gone || []).forEach((v) => items.push({ kind: 'text-gone', field: 'gone', value: v }));
+      }
+      const row = { n: step.n, desc: step.desc, items: items.length, before: step.check, suggested: null, dropped: [] };
+      if (items.length >= 2) {
+        let res = null;
+        try { res = await window.__fypSemantic({ task: 'evidence', intent: { desc: step.desc, phrase: phrase || routine.name }, items: items.map((it, i) => ({ i, kind: it.kind, value: it.value })) }); } catch (e) { res = null; }
+        const keep = ((res && res.ranked) || []).filter((r) => r && Number.isInteger(r.i) && items[r.i]).map((r) => r.i);
+        const uniq = [...new Set(keep)];
+        if (uniq.length && uniq.length < items.length) {
+          const sug = { typed: false, appeared: [], gone: [], ctl: [], style: ev.style || null };
+          uniq.forEach((i) => sug[items[i].field].push(items[i].value));
+          row.suggested = sug;
+          row.suggestedCheck = checkText(sug);
+          row.dropped = items.filter((_, i) => !uniq.includes(i)).map((x) => x.value);
+          semantic.calls++;
+        }
+      }
+      out.push(row);
+    }
+    return { ok: true, steps: out };
+  }
+
   const paramValue = (spec, params) => (spec && typeof spec === 'object' ? (params && params[spec.param] != null ? params[spec.param] : spec.default) : spec);
 
   /** A taught step, as the same object shape the ladder already runs on. */
-  function intentFromStep(step, idx, routine, params) {
-    const d = step.target, ev = step.evidence;
+  function intentFromStep(step, idx, routine, params, useSuggested) {
+    const d = step.target, ev = useSuggested && step.suggested ? step.suggested : step.evidence;
     const expected = (list) => list.map((t) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => normText(paramValue({ param: k, default: (routine.params[k] || {}).default }, params))));
     const it = {
-      id: routine.name + '.' + (idx + 1), learned: true, action: step.action, desc: step.desc, successDesc: step.check,
+      id: routine.name + '.' + (idx + 1), learned: true, action: step.action, desc: step.desc, successDesc: useSuggested && step.suggested ? checkText(ev) : step.check,
       labels: [d.label, d.text, d.placeholder].filter((x) => x && x.length <= 40),
       anchor: null, region: d.region, ordinal: 0,
       geo: { tag: d.tag, ...d.geo },
@@ -3087,7 +3415,7 @@
       breaks.forEach((k) => applyBreak(k));
       for (let i = 0; i < routine.steps.length; i++) {
         const step = routine.steps[i];
-        const it = intentFromStep(step, i, routine, params);
+        const it = intentFromStep(step, i, routine, params, !!opts.useSuggested);
         if (arm === 'baseline') {
           const t0 = now();
           let outcome = 'success', detail = 'the stored locator resolved', effect = false;
@@ -3137,6 +3465,7 @@
     order: r.order, intent: r.intent, arm: r.arm || 'healed', route: r.route, routeIndex: r.routeIndex,
     grade: r.grade, outcome: r.outcome, diagnosis: diagnosis(r), detail: r.detail, ms: r.ms,
     failedActions: r.failedActions == null ? null : r.failedActions, memory: r.memory || '',
+    semanticCalls: r.semanticCalls == null ? 0 : r.semanticCalls,
   });
   const intentById = (id) => INTENTS.find((i) => i.id === id);
   const agentBusy = () => running || state.exp.active;
@@ -3189,7 +3518,7 @@
   async function agentFlow(opts) {
     opts = opts || {};
     if (agentBusy()) return { ok: false, needsUser: false, error: 'busy', userMessage: 'The assistant is already running a task.' };
-    const arm = opts.arm === 'baseline' ? 'baseline' : 'healed';
+    const arm = ['baseline', 'llm-only'].includes(opts.arm) ? opts.arm : 'healed';
     const breaks = (opts.breaks || []).filter((k) => BREAKS[k]);
     if ((opts.breaks || []).length !== breaks.length) {
       return { ok: false, error: 'unknown-break', userMessage: 'Unknown break id in: ' + (opts.breaks || []).join(', ') };
@@ -3201,10 +3530,10 @@
       // re-apply it after their own reset (see the trap noted in the plan).
       await resetApp();
       breaks.forEach((k) => applyBreak(k));
-      if (arm === 'baseline') await runBaseline(); else await runHealed();
+      if (arm === 'baseline') await runBaseline(); else if (arm === 'llm-only') await runLlmOnly(); else await runHealed();
       const runId = state.runId;
       const rows = state.log.filter((r) => r.run === runId && (arm === 'baseline') === (r.arm === 'baseline'));
-      const summary = state.runs[arm] || { ok: 0, total: INTENTS.length };
+      const summary = (arm === 'llm-only' ? state.runs.llmOnly : state.runs[arm]) || { ok: 0, total: INTENTS.length };
       const failed = rows.find((r) => r.outcome !== 'success' && r.outcome !== 'failed-predicate') || rows.find((r) => r.outcome !== 'success');
       const ok = summary.ok === summary.total;
       const out = {
@@ -3247,10 +3576,15 @@
     }
   }
 
-  async function agentExperiment(n, set) {
-    await runExperiment(Math.max(1, Math.min(50, n || 1)), set || 'demo');
-    return JSON.parse(resultsJson());
+  async function agentExperiment(n, set, arms) {
+    await runExperiment(Math.max(1, Math.min(50, n || 1)), set || 'demo', arms);
+    return Object.assign(JSON.parse(resultsJson()), { semantic: semanticStats() });
   }
+
+  const semanticStats = () => ({
+    enabled: semantic.enabled, provider: semantic.provider, calls: semantic.calls, errors: semantic.errors,
+    cacheHits: semantic.cached, inputTokens: semantic.inTok, outputTokens: semantic.outTok, modelMs: Math.round(semantic.ms),
+  });
 
   window.__FYP_AGENT = {
     version: AGENT_VERSION,
@@ -3270,8 +3604,16 @@
       start: teachStart,
       stop: teachStop,
       status: () => ({ recording: teach.on, name: teach.name, steps: teach.steps.length, warnings: teach.warnings.slice() }),
+      suggest: teachSuggest,
     },
     runRoutine: agentRoutine,
+    // The semantic (model) rung. The model itself is supplied by the runner as
+    // window.__fypSemantic; with none, the rung simply does nothing.
+    semantic: {
+      configure: (o) => { semantic.enabled = !!(o && o.enabled) && typeof window.__fypSemantic === 'function'; return semantic.enabled; },
+      stats: semanticStats,
+      reset: () => { Object.assign(semantic, { calls: 0, errors: 0, ms: 0, inTok: 0, outTok: 0, cached: 0 }); return semanticStats(); },
+    },
     // Route memory (see 4b): export / import it so it survives a fresh page.
     memory: {
       get: () => JSON.parse(JSON.stringify(memory.intents)),
@@ -3280,6 +3622,7 @@
       summary: () => Object.entries(memory.intents).map(([id, r]) => ({
         intent: id, runs: r.runs, route: ROUTES[r.route] ? ROUTES[r.route].name : null, avoid: r.avoid.map((x) => ROUTES[x].name),
         drifts: r.drifts, runsToSettle: r.settledAfter, settling: r.sinceDrift !== null && r.settledAfter === null,
+        learned: !!r.learned,
       })),
     },
   };

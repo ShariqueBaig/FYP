@@ -79,16 +79,18 @@ if (!cmd || args.help) {
     'fyp.mjs run [--arm healed|baseline] [--breaks B1,B4] [--caption "text"] [--shot out.png]',
     'fyp.mjs intent <intent.id> [--caption "text"]',
     'fyp.mjs survey',
-    'fyp.mjs experiment [--n 3] [--set demo|full] [--out dir]',
+    'fyp.mjs experiment [--n 3] [--set demo|full|semantic] [--arms baseline,healed,llm-only,hybrid] [--semantic offline|anthropic] [--out dir]',
     'fyp.mjs say "post a photo with caption hello" [--speak]   plain English in; one JSON out (+ a sentence to read aloud)',
     'fyp.mjs teach --name like.first --say "like the first post" --headed   do a task ONCE by hand; Enter to finish; it learns the steps + a check for each',
     'fyp.mjs routines                   what has been taught',
+    'fyp.mjs suggest <routine> --semantic offline|anthropic   model picks which recorded changes show the goal (stored as a suggestion; replay with routine <name> --use-suggested)',
     'fyp.mjs routine <name> [--params \'{"comment":"hi"}\'] [--breaks B1] [--arm healed|baseline] [--memory]',
     'fyp.mjs learn [--runs 8] [--drift-at 3] [--breaks B1,B6] [--out dir]   does remembering routes pay off after the UI changes?',
     'fyp.mjs run ... --memory           healed arm that remembers which route worked / failed',
     'fyp.mjs protect --url <site> --setting "<label>" [--n 10] [--gap 3] [--out dir]   how does the site\'s protection treat this agent? (measures, never evades)',
     'fyp.mjs login                      sign in to the live app with the vault login',
     'fyp.mjs vault status|set|clear     where the live login is kept (never printed)',
+    'model:  [--semantic offline|anthropic] [--semantic-model id] [--semantic-cache file] [--semantic-shot]   a model the harness asks only when every rule fails (anthropic needs ANTHROPIC_API_KEY in the env)',
     'common: [--viewport 410x779] [--headed] [--url http://host:port]',
     'live:   [--live] [--login]   --live opens the app WITHOUT demo mode; --login signs in from the vault',
     'gated site: set FYP_CF_ACCESS_ID + FYP_CF_ACCESS_SECRET (Cloudflare Access service token)',
@@ -173,6 +175,21 @@ try {
 const page = await (await browser.newContext({ viewport: { width: vw, height: vh }, ...(accessHeaders ? { extraHTTPHeaders: accessHeaders } : {}) })).newPage();
 page.on('pageerror', (e) => log('pageerror:', e.message));
 
+// The semantic rung: a model the harness may ask when the rules cannot find a control.
+// Off unless --semantic offline|anthropic is given (see semantic.mjs).
+const { bridgeFromFlags } = await import('./semantic.mjs');
+const sem = bridgeFromFlags({
+  semantic: typeof args.semantic === 'string' ? args.semantic : null,
+  model: typeof args['semantic-model'] === 'string' ? args['semantic-model'] : null,
+  cache: typeof args['semantic-cache'] === 'string' ? args['semantic-cache'] : null,
+  screenshot: args['semantic-shot'] ? async () => (await page.screenshot({ type: 'png' })).toString('base64') : null,
+  log,
+});
+if (!sem.ok) { await browser.close().catch(() => {}); if (served) served.server.close(); emit(sem, 2); }
+if (sem.secret) secrets.add(sem.secret);
+if (sem.bridge) await page.exposeFunction('__fypSemantic', sem.bridge);
+const semanticStats = async () => (sem.bridge ? { ...(await page.evaluate(() => window.__FYP_AGENT.semantic.stats())), bridge: sem.bridge.stats } : null);
+
 // A rate limit shows up as refused sub-requests (HTTP 429), not as a broken page.
 // Name it, so the user is not told to "check the build" when the site is throttling.
 let throttled = 0;
@@ -230,18 +247,21 @@ try {
   const ready = await page.evaluate(() => (window.__FYP_AGENT ? window.__FYP_AGENT.ready(30000) : false));
   if (!ready) await finish(notReady(live ? 'Signed in, but the feed did not finish loading.' : 'The app or harness did not finish loading. Check that demo/ is a current build.'), throttled ? 1 : 2);
 
+  if (sem.bridge) await call('semantic.configure', { enabled: true });
   if (cmd === 'describe') await finish(await call('describe'), 0);
   if (cmd === 'status') await finish(await call('status'), 0);
 
   if (cmd === 'run') {
     const opts = {
-      arm: args.arm === 'baseline' ? 'baseline' : 'healed',
+      arm: ['baseline', 'llm-only'].includes(args.arm) ? args.arm : 'healed',
       breaks: typeof args.breaks === 'string' ? args.breaks.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean) : [],
       caption: typeof args.caption === 'string' ? args.caption : undefined,
       memory: !!args.memory,
     };
+    if (opts.arm === 'llm-only' && !sem.bridge) await finish({ ok: false, error: 'usage', userMessage: '--arm llm-only needs a model: add --semantic offline or --semantic anthropic.' }, 2);
     log('run', JSON.stringify(opts));
     const res = await call('runFlow', opts);
+    if (sem.bridge) res.semantic = await semanticStats();
     if (typeof args.shot === 'string') {
       await page.screenshot({ path: args.shot });
       res.screenshotFile = path.resolve(args.shot);
@@ -260,7 +280,10 @@ try {
   if (cmd === 'experiment') {
     const n = Number(args.n) || 3;
     log('experiment n=' + n + ' set=' + (args.set || 'demo') + ' (takes a while)');
-    const res = await call('experiment', n, typeof args.set === 'string' ? args.set : 'demo');
+    const arms = typeof args.arms === 'string' ? args.arms.split(',').map((x) => x.trim()).filter(Boolean) : undefined;
+    if (arms && arms.some((a) => ['llm-only', 'hybrid'].includes(a)) && !sem.bridge) await finish({ ok: false, error: 'usage', userMessage: 'Arms llm-only and hybrid need a model: add --semantic offline or --semantic anthropic.' }, 2);
+    const res = await call('experiment', n, typeof args.set === 'string' ? args.set : 'demo', arms);
+    res.semanticBridge = sem.bridge ? sem.bridge.stats : null;
     if (typeof args.out === 'string') {
       fs.mkdirSync(args.out, { recursive: true });
       fs.writeFileSync(path.join(args.out, 'results.json'), JSON.stringify(res, null, 2));
@@ -270,7 +293,7 @@ try {
       }
       res.savedTo = path.resolve(args.out);
     }
-    await finish({ ok: true, summary: res.summary, savedTo: res.savedTo || null }, 0);
+    await finish({ ok: true, summary: res.summary, semantic: res.semantic || null, semanticBridge: res.semanticBridge, savedTo: res.savedTo || null }, 0);
   }
 
   // teach: the user does a task ONCE by hand in a real window; the harness turns it
@@ -291,6 +314,24 @@ try {
     await finish({ ok: true, saved: path.relative(process.cwd(), file), name: args.name, steps: res.routine.steps.length, readback: res.readback, params: res.routine.params, phrases: res.routine.phrases, warnings: res.warnings }, 0);
   }
 
+  // suggest <routine>: ask the model which of the changes recorded after each step really show the goal.
+  // Stored beside the original (step.suggested); replay uses it only with `routine <name> --use-suggested`.
+  if (cmd === 'suggest') {
+    if (!sem.bridge) await finish({ ok: false, error: 'usage', userMessage: 'suggest needs a model: add --semantic offline or --semantic anthropic.' }, 2);
+    const name = args._[1];
+    const routine = loadRoutines().find((r) => r.name === name);
+    if (!routine) await finish({ ok: false, error: 'unknown-routine', userMessage: 'I have not been taught "' + name + '".' }, 2);
+    const res = await call('teach.suggest', routine, (routine.phrases || [])[0]);
+    if (!res.ok) await finish(res, 2);
+    for (const r of res.steps) {
+      const st = routine.steps.find((x) => x.n === r.n);
+      if (r.suggested) st.suggested = r.suggested; else delete st.suggested;
+    }
+    const file = path.join(ROUTINES, name.replace(/[^a-z0-9._-]+/gi, '_') + '.json');
+    fs.writeFileSync(file, JSON.stringify(routine, null, 2) + '\n');
+    await finish({ ok: true, routine: name, saved: path.relative(process.cwd(), file), steps: res.steps, semanticBridge: sem.bridge.stats, note: 'Nothing is applied until you replay with: routine ' + name + ' --use-suggested' }, 0);
+  }
+
   if (cmd === 'routine') {
     const name = args._[1];
     const routine = loadRoutines().find((r) => r.name === name);
@@ -306,7 +347,7 @@ try {
     try { if (typeof args.params === 'string') params = JSON.parse(args.params); } catch { await finish({ ok: false, error: 'usage', userMessage: '--params must be JSON, e.g. --params \'{"comment":"nice"}\'' }, 2); }
     if (typeof args.param === 'string' && args.param.includes('=')) { const [k, ...v] = args.param.split('='); params[k] = v.join('='); }
     const res = await call('runRoutine', {
-      routine, params, memory: !!args.memory,
+      routine, params, memory: !!args.memory, useSuggested: !!args['use-suggested'],
       arm: args.arm === 'baseline' ? 'baseline' : 'healed',
       breaks: typeof args.breaks === 'string' ? args.breaks.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean) : [],
     });
@@ -321,23 +362,30 @@ try {
     const driftAt = Math.min(runs - 1, Math.max(1, Number(args['drift-at']) || 3));
     const breaks = (typeof args.breaks === 'string' ? args.breaks : 'B1,B6').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
     const arms = {};
-    for (const arm of ['memory', 'plain']) {
+    // plain / memory are the original pair; with a model, semantic and semantic+memory
+    // show what asking a model costs and whether distilling its answer pays that back.
+    const armNames = sem.bridge ? ['plain', 'memory', 'semantic', 'semantic+memory'] : ['memory', 'plain'];
+    for (const arm of armNames) {
       await call('memory.clear');
+      await call('semantic.reset');
+      await call('semantic.configure', { enabled: arm.startsWith('semantic') });
       arms[arm] = { runs: [] };
       for (let r = 1; r <= runs; r++) {
         const armed = r > driftAt ? breaks : [];
         log('learn ' + arm + ' run ' + r + '/' + runs + (armed.length ? ' breaks=' + armed.join('+') : ' (healthy)'));
-        const res = await call('runFlow', { breaks: armed, memory: arm === 'memory' });
+        const res = await call('runFlow', { breaks: armed, memory: arm === 'memory' || arm === 'semantic+memory' });
         const rows = res.rows || [];
         arms[arm].runs.push({
           run: r, breaks: armed, ok: !!res.ok, stepsOk: res.stepsOk,
           failedActions: rows.reduce((s, x) => s + (x.failedActions || 0), 0),
+          semanticCalls: rows.reduce((s, x) => s + (x.semanticCalls || 0), 0),
           ms: rows.reduce((s, x) => s + (x.ms || 0), 0),
           routes: rows.map((x) => x.route),
         });
       }
-      if (arm === 'memory') arms[arm].memory = await call('memory.summary');
+      if (arm.endsWith('memory')) arms[arm].memory = await call('memory.summary');
     }
+    await call('semantic.configure', { enabled: !!sem.bridge });
     const after = (a) => arms[a].runs.filter((x) => x.run > driftAt);
     const mean = (xs) => (xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 10) / 10 : null);
     // Runs to settle, per arm: from the run where the change first appeared (counted
@@ -346,11 +394,12 @@ try {
     const out = {
       ok: true, driftAt, runs, breaks,
       summary: {
-        afterDrift: {
-          memory: { meanFailedActions: mean(after('memory').map((x) => x.failedActions)), meanMs: mean(after('memory').map((x) => x.ms)), fullFlows: after('memory').filter((x) => x.ok).length },
-          plain: { meanFailedActions: mean(after('plain').map((x) => x.failedActions)), meanMs: mean(after('plain').map((x) => x.ms)), fullFlows: after('plain').filter((x) => x.ok).length },
-        },
-        runsToSettle: { memory: settleOf('memory'), plain: settleOf('plain') },
+        afterDrift: Object.fromEntries(armNames.map((a) => [a, {
+          meanFailedActions: mean(after(a).map((x) => x.failedActions)), meanMs: mean(after(a).map((x) => x.ms)),
+          meanModelCalls: mean(after(a).map((x) => x.semanticCalls)), fullFlows: after(a).filter((x) => x.ok).length,
+        }])),
+        runsToSettle: Object.fromEntries(armNames.map((a) => [a, settleOf(a)])),
+        modelCallsPerRun: Object.fromEntries(armNames.filter((a) => a.startsWith('semantic')).map((a) => [a, arms[a].runs.map((x) => x.semanticCalls)])),
         note: 'runsToSettle = runs from the one where the UI change first appeared (counted as 1) to the first run that wasted no action; null = did not settle within the runs given. A wasted action is a route that resolved to one control, was acted on and did not achieve the goal. B1 re-randomises hook names every run, so per-intent drift counts in arms.memory.memory are high by design.',
       },
       arms,
@@ -358,8 +407,8 @@ try {
     if (typeof args.out === 'string') {
       fs.mkdirSync(args.out, { recursive: true });
       fs.writeFileSync(path.join(args.out, 'learn.json'), JSON.stringify(out, null, 2));
-      const lines = ['arm,run,breaks,ok,steps_ok,failed_actions,ms'];
-      for (const [arm, a] of Object.entries(arms)) for (const x of a.runs) lines.push([arm, x.run, x.breaks.join('+') || 'clean', x.ok, x.stepsOk, x.failedActions, x.ms].join(','));
+      const lines = ['arm,run,breaks,ok,steps_ok,failed_actions,model_calls,ms'];
+      for (const [arm, a] of Object.entries(arms)) for (const x of a.runs) lines.push([arm, x.run, x.breaks.join('+') || 'clean', x.ok, x.stepsOk, x.failedActions, x.semanticCalls, x.ms].join(','));
       fs.writeFileSync(path.join(args.out, 'learn.csv'), lines.join('\n') + '\n');
       out.savedTo = path.resolve(args.out);
     }

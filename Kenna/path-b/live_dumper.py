@@ -245,7 +245,7 @@ def main():
         spec = SCREEN_SPEC[screen_name]
         print(
             "\n" + "=" * 60
-            f"\nSCREEN {si}/{len(screens_to_dump)}: {screen_name.upper()}"
+            + f"\nSCREEN {si}/{len(screens_to_dump)}: {screen_name.upper()}"
             + "\n" + "=" * 60
         )
         print(f"Navigation hint: {spec['navigate_hint']}")

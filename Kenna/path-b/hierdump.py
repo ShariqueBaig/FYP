@@ -120,6 +120,19 @@ class Node:
     def label(self) -> str:
         return self.desc or self.text or self.rid.split("/")[-1] or self.cls.split(".")[-1]
 
+    @property
+    def name(self) -> str:
+        """The accessible name a screen reader would speak: the control's own content-desc /
+        text, else the words of its non-clickable descendants (how TalkBack names a clickable
+        row or card). Measured live on stock Android Settings: every control with no own
+        text/desc was named this way, so judging a control by its own attributes alone
+        overstates how anonymous it is."""
+        own = self.desc or self.text
+        if own:
+            return own
+        return " ".join((d.desc or d.text) for d in self.descendants()
+                        if (d.desc or d.text) and not d.clickable).strip()
+
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<{self.cls.split('.')[-1]} rid={self.rid!r} desc={self.desc!r} text={self.text!r}>"
 
@@ -375,6 +388,7 @@ def coverage_report(name: str, nodes: list) -> dict:
         if n.desc:
             desc_counts[n.desc] = desc_counts.get(n.desc, 0) + 1
     anon = [n for n in controls if not (n.rid or n.desc or n.text)]
+    nameless = [n for n in anon if not n.name]          # nothing a screen reader could say
     return {
         "screen": name,
         "nodes": len(nodes),
@@ -382,7 +396,9 @@ def coverage_report(name: str, nodes: list) -> dict:
         "has_rid": sum(1 for n in controls if n.rid),
         "has_desc": sum(1 for n in controls if n.desc),
         "has_text": sum(1 for n in controls if n.text),
-        "anonymous": len(anon),
+        "anonymous": len(anon),                      # no own rid/desc/text (a locator has no direct hook)
+        "named_by_child": len(anon) - len(nameless),  # ...but a child label names it: locatable by a scoped chain
+        "nameless": len(nameless),                    # no name anywhere: screen reader AND text locators have nothing
         # a control whose OWN hook resolves to it alone in the whole tree
         "rid_unique_usable": sum(1 for n in controls if n.rid and rid_counts[n.rid] == 1),
         "desc_unique_usable": sum(1 for n in controls if n.desc and desc_counts[n.desc] == 1),
@@ -401,7 +417,7 @@ def print_coverage(rows: list):
     head = ("screen", "ctrl", "rid", "desc", "text", "anon", "rid1", "ridX", "desc1", "descX")
     print("%-28s %5s %5s %5s %5s %5s %5s %5s %6s %6s" % head)
     print("-" * 92)
-    tot = {k: 0 for k in ("controls", "has_rid", "has_desc", "has_text", "anonymous",
+    tot = {k: 0 for k in ("controls", "has_rid", "has_desc", "has_text", "anonymous", "named_by_child", "nameless",
                           "rid_unique_usable", "rid_shared",
                           "desc_unique_usable", "desc_shared")}
     for r in rows:
@@ -422,11 +438,16 @@ def print_coverage(rows: list):
           f"rid {100*tot['rid_unique_usable']/c:.0f}%   desc {100*tot['desc_unique_usable']/c:.0f}%")
     print(f"  either rid or desc present:         {100*(tot['has_rid'] or 0)/c:.0f}% / "
           f"{100*(tot['has_desc'] or 0)/c:.0f}%  (overlap not de-duplicated)")
-    print(f"  ANONYMOUS (screenshot-fallback zone): {100*tot['anonymous']/c:.0f}%")
+    print(f"  no own rid/desc/text:               {100*tot['anonymous']/c:.0f}%   "
+          f"of which named by a child label {100*tot['named_by_child']/c:.0f}%")
+    print(f"  NAMELESS (screenshot-fallback zone): {100*tot['nameless']/c:.0f}%   "
+          f"<- nothing for a screen reader or a text locator")
     print()
     print("  Read it like this:")
-    print("   * anonymous% is the size of the screenshot-fallback surface - that is the")
-    print("     number your hybrid design has to live with, and the paper's headline.")
+    print("   * NAMELESS% is the size of the screenshot-fallback surface - the number your")
+    print("     hybrid design has to live with. Judge it on the accessible NAME (own text/desc,")
+    print("     else child labels), not on the control's own attributes: on stock Settings the")
+    print("     own-attribute view said 59% anonymous and the name-aware view said 0%.")
     print("   * ridX/descX are collisions: a hook exists but is shared, so it needs a")
     print("     scoped chain. High collisions mean 'ladder + scoping', not 'no hooks'.")
     print("   * rid is version-pinned. Re-run this per app build to get half-life.")

@@ -625,3 +625,29 @@ Reading: the recorded-locator baseline fails exactly where the plan predicts, on
 - Two routines, one app. A second app and more routines are the next test.
 - The baseline was first unfair (an absolute path for a text-only control, so it failed on the clean app); fixed to what a normal recorder produces, then re-measured. Quote only the fixed numbers.
 - Taught in a scripted demonstration (`agent/teach.demo.mjs`, real mouse and keyboard); `fyp.mjs teach --headed` for a person is built but has not been tried by a person yet.
+
+### 2026-10-29 — Semantic (model) rung, distillation, Android layer
+
+**What was built.** A `semantic` rung (agent/semantic.mjs bridge, harness route 6) asked only when the rules fail; the model answers with indices into the on-screen control list only, its pick is a *candidate* judged by the step's success check, and `irreversible` intents (publish) need confidence >= 0.8 and the first choice only. A `learned` rung distils a model win into route memory (no hook in it). New breaks B9 (reword copy) and B10 (relocate control). New arms `llm-only` (model's first choice, no checking) and `hybrid` (rules + model). Rung order is now id, label, text, scoped, learned, semantic, vision: a blind position guess was tapping wrong controls (e.g. Close) before the model was asked. `share.post` now requires the caption in the feed (any abandoned draft also "returned to the feed").
+
+**IMPORTANT LIMIT.** No API key was available. Every number below uses `--semantic offline`, a deterministic word-overlap + synonym stand-in. It is a plumbing check, **not** a measure of a language model. The `anthropic` provider is unit-tested with a stubbed fetch and has never been called live. Redo with `--semantic anthropic --semantic-cache f.json` (key in the env, never in chat) before quoting anything as a model result. n = 2 per cell.
+
+**4-arm experiment** (`agent/results/semantic/experiment/`, set `semantic`, offline stand-in, n=2). Flows completed / wrong actions per run / silent wrong per run:
+
+| config | baseline | healed (rules) | llm-only | hybrid |
+|---|---|---|---|---|
+| clean | 2/2, 1.0, 1.0 | 2/2, 0, 0 | 0/2, 1.0, 1.0 | 2/2, 0, 0 |
+| B9 | 0/2, 1.0, 1.0 | 2/2, 0, 0 | 0/2, 1.0, 1.0 | 2/2, 3.0, 0 |
+| B1+B9 | 0/2 | 0/2 | 0/2, 2.0, 2.0 | 2/2, 3.0, 0 |
+| B1+B9+B10 | 0/2 | 0/2 | 0/2, 0, 0 | 2/2, 4.0, 0 |
+| B1+B2+B9+B10 | 0/2 | 0/2 | 0/2, 5.0, 5.0 | 0/2, 3.0, 0 |
+
+Reading it: rules alone fail once ids rot and words change (B1+B9). Adding the model rung completes the flow in three of those four drift configs, with **zero silent wrong actions** (its wrong taps are caught by the predicate and recovered from; they cost time: 3-4 wasted actions/run). The unchecked llm-only arm never completes a flow and makes 1-5 silent wrong actions per run, even on the clean app. When no control has any readable word left (B1+B2+B9+B10) nothing text-based can help; hybrid stops honestly (a screenshot rung is not built). Silent-wrong for `baseline` is measured post hoc and is a property of the recorded locator, not a new failure.
+
+**Distillation** (`learn --semantic offline --runs 5 --drift-at 2 --breaks B1,B9,B10`, `agent/results/semantic/learn/`): model calls per run after the UI changed: semantic only 7, 7, 7; semantic+memory 7, 1, 1, with the flow still completing. The remaining call is `gallery.select`, which targets a different photo each run so a remembered position is wrong. Caveat: B10's moved control is partly covered by the gallery, so compose.next goes via the keyboard route in these runs, and `runsToSettle` stays null because those obscured taps count as wasted.
+
+**Android.** `path-b/android_layer.py`: same ladder and model rung over UiAutomator dumps; selftest (13 checks) passes against a SYNTHETIC app. `AdbDriver` untested: no emulator or device was run (the SDK and adb exist, no AVD). No Android result exists. `live_dumper.py` syntax bug fixed (still needs Appium); `intent_route_layer.py` imports.
+
+### 2026-10-29 (later) — Android emulator, first live dumps
+SDK + emulator installed on D:\AndroidSdk (outside OneDrive), AVD `kenna` (Pixel 6, Android 34 Google APIs). `adb_capture.py` dumps real screens first time. Stock Settings + launcher only, five dumps in `path-b/dumps/`. **Coverage correction:** judging a control by its own attributes gave 59% "anonymous"; all of those were named by a child label (how a screen reader names a clickable row), so with the accessible name it is **4% nameless (2 of 49)**. Report the name-aware figure. Other real-device findings: row names are "title subtitle" (leading-title match added), non-ASCII text broke console printing (fixed), and test state must be reset explicitly (`am start` re-fronts the last page). First intent through `android_layer.AdbDriver` on the device: rules succeed on the `text` route; with a reworded hint rules stop honestly (0 wasted taps); rules + the offline stand-in model succeed on the first model pick. n=1, one app, a stub model: plumbing evidence only. No real model has run on Android or web. Not yet done: real model, more intents/sessions, the project's own app on the emulator, real drift, a screenshot rung.
+

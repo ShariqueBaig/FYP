@@ -1,6 +1,6 @@
 {
   "name": "fyp_gui_harness",
-  "description": "Drive the mock Instagram app through intents with a self-healing ladder (id > label > text > scoped > vision > keyboard). Every call prints one JSON document. On failure, `userMessage` must be relayed to the user as-is.",
+  "description": "Drive the mock Instagram app through intents with a self-healing ladder (id > label > text > scoped > learned > semantic > position, then keyboard). The semantic rung asks a model ONLY when the rules cannot find a control, and its answer is still verified against the step's success check. Every call prints one JSON document. On failure, `userMessage` must be relayed to the user as-is.",
   "invoke": "node agent/fyp.mjs <command> [flags]",
   "exit_codes": {
     "0": "completed",
@@ -19,8 +19,8 @@
     },
     {
       "name": "create_post",
-      "command": "node agent/fyp.mjs run --caption <caption> [--breaks B1,B4] [--arm healed|baseline] [--shot file.png]",
-      "description": "Run the full create-post flow (9 intents) and verify the post appears in the feed. Returns stepsOk/stepsTotal, per-step route used (id/label/text/scoped/vision, +keyboard), and, if it could not finish, needsUser=true with a first-person userMessage naming the step it is stuck on.",
+      "command": "node agent/fyp.mjs run --caption <caption> [--breaks B1,B4] [--arm healed|baseline] [--shot file.png] [--semantic offline|anthropic]",
+      "description": "Run the full create-post flow (9 intents) and verify the post appears in the feed. Returns stepsOk/stepsTotal, per-step route used (id/label/text/scoped/vision, +keyboard), and, if it could not finish, needsUser=true with a first-person userMessage naming the step it is stuck on. With --semantic, a model is asked only when every rule route fails; each row reports semanticCalls.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -32,7 +32,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "pattern": "^B[1-8]$"
+              "pattern": "^B([1-9]|10)$"
             },
             "description": "UI breaks to inject first (testing only). Never set for a real user task."
           },
@@ -40,9 +40,10 @@
             "type": "string",
             "enum": [
               "healed",
-              "baseline"
+              "baseline",
+              "llm-only"
             ],
-            "description": "baseline = recorded-locator script, for comparison only."
+            "description": "baseline = recorded-locator script; llm-only = model's first choice with no checking (needs --semantic). Both for comparison only."
           },
           "memory": {
             "type": "boolean",
@@ -81,8 +82,8 @@
     },
     {
       "name": "experiment",
-      "command": "node agent/fyp.mjs experiment --n <N> --set demo|full --out <dir>",
-      "description": "Baseline vs healed, N repetitions over break configurations. Writes results.json, summary.csv, attempt-log.csv to <dir>. Slow: demo set is 6 configs x 2 arms per repetition.",
+      "command": "node agent/fyp.mjs experiment --n <N> --set demo|full|semantic [--arms baseline,healed,llm-only,hybrid] [--semantic offline|anthropic] --out <dir>",
+      "description": "Arms over break configurations, N repetitions. Default baseline vs healed. Add llm-only (model only, unchecked) and hybrid (rules + model) with --semantic. Reports steps, full flows, wrong actions, SILENT wrong actions, model calls and time per arm. Writes results.json, summary.csv, attempt-log.csv to <dir>. Slow.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -95,11 +96,16 @@
             "type": "string",
             "enum": [
               "demo",
-              "full"
+              "full",
+              "semantic"
             ]
           },
           "out": {
             "type": "string"
+          },
+          "arms": {
+            "type": "string",
+            "description": "Comma list of arms. llm-only and hybrid need --semantic."
           }
         }
       }
@@ -122,8 +128,8 @@
     },
     {
       "name": "learn",
-      "command": "node agent/fyp.mjs learn --runs <R> --drift-at <K> --breaks <B1,B6> --out <dir>",
-      "description": "Does remembering routes pay off after the UI changes? R back-to-back runs; the app is healthy for the first K, then the breaks arrive. Run with route memory on and off; reports failed actions, time and runs-to-settle. Testing/measurement only.",
+      "command": "node agent/fyp.mjs learn --runs <R> --drift-at <K> --breaks <B1,B6> [--semantic offline|anthropic] --out <dir>",
+      "description": "Does remembering routes pay off after the UI changes? R back-to-back runs; the app is healthy for the first K, then the breaks arrive. Run with route memory on and off; reports failed actions, time and runs-to-settle. Testing/measurement only. With --semantic it adds model arms and shows model calls per run: a model answer is distilled into route memory, so calls should fall after the first run on a changed UI.",
       "input_schema": {
         "type": "object",
         "properties": {

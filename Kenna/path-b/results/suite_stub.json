@@ -1,0 +1,871 @@
+{
+  "model": "offline-lexical STUB",
+  "sessions": 3,
+  "arms": {
+    "exact": {
+      "ok": 18,
+      "total": 18,
+      "wasted": 0,
+      "model_calls": 0,
+      "silent": 0,
+      "rows": [
+        {
+          "session": 1,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.apps",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "back.flow",
+          "ok": true,
+          "routes": [
+            "text",
+            "content-desc"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "content-desc"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "text",
+            "text"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.apps",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "back.flow",
+          "ok": true,
+          "routes": [
+            "text",
+            "content-desc"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "content-desc"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "text",
+            "text"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.apps",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "back.flow",
+          "ok": true,
+          "routes": [
+            "text",
+            "content-desc"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "content-desc"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "text",
+            "text"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        }
+      ]
+    },
+    "stale": {
+      "ok": 0,
+      "total": 18,
+      "wasted": 0,
+      "model_calls": 0,
+      "silent": 0,
+      "rows": [
+        {
+          "session": 1,
+          "case": "settings.network",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.sound",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "display.dark",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "search.flow",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.network",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.sound",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "display.dark",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "search.flow",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.network",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.sound",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "display.dark",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "search.flow",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        }
+      ]
+    },
+    "hybrid": {
+      "ok": 12,
+      "total": 18,
+      "wasted": 9,
+      "model_calls": 24,
+      "silent": 0,
+      "rows": [
+        {
+          "session": 1,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "semantic[0]",
+            "none"
+          ],
+          "outcomes": [
+            "success",
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "semantic[0]",
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "semantic[0]",
+            "none"
+          ],
+          "outcomes": [
+            "success",
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "semantic[0]",
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "semantic[0]",
+            "none"
+          ],
+          "outcomes": [
+            "success",
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "semantic[0]",
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        }
+      ]
+    },
+    "llm-only": {
+      "ok": 12,
+      "total": 18,
+      "wasted": 3,
+      "model_calls": 24,
+      "silent": 3,
+      "rows": [
+        {
+          "session": 1,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "failed-silent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "model-first-choice",
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success",
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "model-first-choice",
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "failed-silent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "model-first-choice",
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success",
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 2,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "model-first-choice",
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "failed-silent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "model-first-choice",
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success",
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 3,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "model-first-choice",
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        }
+      ]
+    }
+  },
+  "note": "stale-hint drift is simulated on the intent side; stub model is not a language model"
+}

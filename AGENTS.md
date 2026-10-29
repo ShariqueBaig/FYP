@@ -1,6 +1,6 @@
 # AGENTS.md - read this first (for Momo and any other coding/ops agent)
 
-> **Full guide to everything built, how to run it and what is tested: [`Kenna/README.md`](Kenna/README.md).** This file is the rules and the command table.
+> **Full guide to everything built, how to run it and what is tested: [`Kenna/README.md`](Kenna/README.md). What is unfinished and how to continue: [`Kenna/NEXT_STEPS.md`](Kenna/NEXT_STEPS.md).** This file is the rules and the command table.
 
 **Project:** intent-aware, self-healing GUI automation for accessible AI assistants
 (FYP: Sharique Baig, Maira Aijaz, Barkhi Khan). All work lives in `Kenna/`.
@@ -40,6 +40,8 @@ Firebase and no `node_modules` for the app.
 | `routines` / `routine <name> [--params '{...}'] [--breaks B1] [--arm baseline]` | list / replay taught routines through the healing ladder |
 | `learn --runs 8 --drift-at 3 --breaks B1,B6` | route-memory experiment: memory on vs off after the UI changes (failed actions, time, runs to settle) |
 | `protect --url <site> --setting "<label>" --n 10 --out results/protection` | how a site's protection layer treats this agent; measures and reports only, never evades |
+| `... --semantic offline\|anthropic` | the **semantic rung**: a model is asked only when every rule route fails. `anthropic` needs `ANTHROPIC_API_KEY` in the environment (never a file, never chat). `offline` is a no-cost lexical stand-in for plumbing tests, **not** a measure of a model. Also `--semantic-model`, `--semantic-cache f.json`, `--semantic-shot` |
+| `experiment --set semantic --arms baseline,healed,llm-only,hybrid` | drift the rules cannot read (B9 reword, B10 relocate); adds wrong-action and silent-wrong-action columns |
 | `login` / `run --login` | live app only: sign in with the vault login, then (for `run`) do the flow. Use `--live --url <site>` |
 | `vault status\|set\|clear` | where the live login is kept. `set` is typed by the human, never by an agent. Status never prints the password |
 
@@ -50,11 +52,11 @@ Common flags: `--viewport 410x779` (default), `--headed`, `--url <already-served
 | path | what | edit? |
 |---|---|---|
 | `Kenna/fyp-mvp/harness.js` | **the product**: intents, ladder, breaks, scoring, agent API (`window.__FYP_AGENT`, section 12) | yes - source of truth; the runner serves it live |
-| `Kenna/agent/` | headless CLI, static server, manifest, Momo contract | yes |
+| `Kenna/agent/` | headless CLI, static server, manifest, Momo contract; `semantic.mjs` is the model bridge (`semantic.test.mjs`) | yes |
 | `Kenna/demo/` | prebuilt mock-Instagram web bundle (generated) | **no** - regenerate, do not hand-edit |
 | `Kenna/insta clone/` | app source - **a separate git repo** (`ShariqueBaig/insta-clone`), git-ignored here | only via its own repo |
 | `Kenna/FYP_MVP_PLAN.md` | decisions, taxonomy S1-S6, progress log. Read section 2 before changing scope | append to section 15 |
-| `Kenna/path-b/` | Android accessibility-tree analyzer (Phase 2). `hierdump.py` works; `live_dumper.py` and `intent_route_layer.py` have known bugs (plan section 8.3) | Phase 2 |
+| `Kenna/path-b/` | Android accessibility-tree layer (Phase 2). `hierdump.py` (offline analyzer) and **`android_layer.py`** (intent/route ladder + model rung, `python android_layer.py selftest`) and **`adb_capture.py`** (adb capture + parser, `selftest`) work against saved/canned/synthetic dumps; `AdbDriver` and `adb_capture.py` have run live on the `kenna` emulator (SDK at `D:\AndroidSdk`) against stock Settings only; no Android arms comparison or real-model result exists. `live_dumper.py` now parses but needs Appium; `intent_route_layer.py` is the old scaffold | Phase 2 |
 | `Kenna/PATH_B_GUIDE.md`, `kenna_android_automation_fyp_briefing_v2-1.md` | Android build procedure / original problem statement | reference |
 | `Kenna/locator-inspector-plugin-v1.0.2/` | related QA tool; **not** this FYP's contribution | no |
 
@@ -77,5 +79,6 @@ bash Kenna/fyp-mvp/sync-demo.sh      # copies dist -> Kenna/demo (without the ha
    `Kenna/insta clone/liveConfig.ts` holds a login for the *live* Firebase
    path and must never be committed or copied here. The demo needs none.
 4. Do not claim Android results from the web demo (plan section 11.2 has the honest wording).
-5. After editing `harness.js`, run `node --check Kenna/fyp-mvp/harness.js` and a clean
+5. After editing `harness.js`, run `node --check Kenna/fyp-mvp/harness.js`, `node Kenna/agent/semantic.test.mjs` and a clean
    `run` plus `run --breaks B1,B4`; expect 9/9, and `--breaks B8` to stop honestly at step 1.
+6. A model is never trusted with an action: it may only answer with indices into the on-screen control list, its answer is acted on as a *candidate* and judged by the step's success check, and an irreversible intent (`irreversible: true`, e.g. publishing) needs confidence >= 0.8 and only the first choice. Never quote `--semantic offline` numbers as a language model's; a model result needs `--semantic anthropic` and the model id stated.
