@@ -1,5 +1,8 @@
 # results/ - committed evidence
 
+> The model-arm results from before the 2026-10-29 state-leak fix (see `docs/FYP_MVP_PLAN.md` section 15) were invalid and have been deleted; `semantic_n10`, `inject_n10` and
+> `vision_*_n5` below are the re-runs on the fixed harness.
+
 Working output of experiments goes to the git-ignored `agent/results/` (`path-b/results/` holds earlier **stub-model** Android runs, tracked and labelled STUB, not citable as model results). **What you cite goes here**, via
 `node agent/report.mjs <dir> --publish <name>` (web) or `python path-b/report_android.py <json> --out results/published/<name>/report_android.md` (Android).
 Each folder holds the raw log (`results.json`, `attempt-log.csv`, `calls.jsonl` when a model was used), a `manifest.json`

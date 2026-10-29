@@ -1029,6 +1029,7 @@
     // A baseline RECORDING pass is not an experiment result - it is the act of
     // writing the script. Logging it would double every row in the scoreboard.
     if (state.recording) return row;
+    if (row.intent === 'setting.toggle') state.switchDirty = true;   // the app keeps the switch on after publishing (see clearLeftoverSwitch)
     row.timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
     if (state.armLabel && !row.arm) row.arm = state.armLabel;   // experiment arms beyond baseline / healed
     row.run = state.runId;
@@ -1684,9 +1685,29 @@
       : { ok: false, needsUser: true, error: 'login-failed', userMessage: loginWhy };
   }
 
+  // After a published post the app keeps the "Add AI label" switch ON in memory, but the switch is
+  // not in the DOM on the feed, so goHome() cannot turn it off. An arm that taps it blindly (llm-only)
+  // then flipped it OFF and was scored as failed on a clean app. Open the caption screen once, so
+  // goHome() can switch it off, before the next arm starts. Same start state for every arm.
+  async function clearLeftoverSwitch() {
+    if (!state.switchDirty) return;
+    state.switchDirty = false;
+    try {
+      await goHome();
+      const hook = (h) => collect().find((c) => c.hook === h);
+      const create = hook('tab-create');
+      if (!create) return;
+      realClick(create.el);
+      await sleep(500);
+      const next = hook('compose-next');
+      if (next) { realClick(next.el); await sleep(500); }
+    } catch (e) {}
+  }
+
   async function resetApp() {
     if (!(await ensureLoggedIn())) return;
     clearChaos();
+    await clearLeftoverSwitch();
     await goHome();
     // The app is whole again - this is the honest moment to hold the baseline's
     // recording. It only ever runs against an intact app.

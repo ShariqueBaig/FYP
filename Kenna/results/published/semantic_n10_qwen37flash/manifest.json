@@ -1,10 +1,10 @@
 {
-  "date": "2026-10-29T11:22:02.007Z",
+  "date": "2026-10-29T13:45:09.943Z",
   "git": {
-    "commit": "a53939e09195ac45c69b3d8e17f87079be0ad512",
+    "commit": "d751c21482354d4e72063aa0c12006013ecf4968",
     "dirty": true
   },
-  "harnessSha256": "18563d0f6c4b5b1b1d09de00c78ac0bc88230cd70d996e097985f58a0b7e6720",
+  "harnessSha256": "e103facd8a6280c6df3e3ef5494da8effe9808b4379b8fcb62ca27dff760da65",
   "command": "fyp.mjs experiment --n 10 --set semantic --arms baseline,healed,llm-only,model-verified,hybrid --semantic openrouter --semantic-model qwen/qwen3.7-flash --semantic-cache agent/results/protocol/cache_openrouter_qwen_qwen3_7-flash.json --out agent/results/protocol/semantic_n10_qwen_qwen3_7-flash",
   "set": "semantic",
   "arms": [
@@ -18,22 +18,22 @@
   "semantic": {
     "enabled": true,
     "provider": "openrouter:qwen/qwen3.7-flash",
-    "calls": 709,
+    "calls": 740,
     "errors": 0,
-    "cacheHits": 341,
-    "inputTokens": 1232512,
-    "outputTokens": 60365,
-    "modelMs": 700275
+    "cacheHits": 395,
+    "inputTokens": 1255881,
+    "outputTokens": 62562,
+    "modelMs": 735467
   },
   "valid": true,
   "invalidReason": null,
   "env": "node v24.11.1, win32",
   "semanticBridge": {
-    "calls": 368,
-    "cacheHits": 341,
+    "calls": 345,
+    "cacheHits": 395,
     "errors": 0,
     "lastError": "",
-    "costUsd": 0.032761306000000004
+    "costUsd": 0.030909552499999982
   },
   "viewport": "410x779"
 }

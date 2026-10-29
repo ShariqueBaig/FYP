@@ -1333,3 +1333,11 @@ stand-in pass as a model result (rule 6 in AGENTS.md).
 section arrows (a bad CSS escape in the generating script).
 **Environment.** `-gpu host` crashed the AMD driver and took the emulator and Edge (`msedge.exe` 0xe0000008) down together; the start script now uses `swiftshader_indirect`. The dashboard serves a
 ~450 px JPEG instead of the 1080x2400 PNG. Not done: a real-model (OpenRouter/Anthropic) run through the dashboard.
+
+### 2026-10-29 (late) - state leak between arms: model-arm results re-run
+**Found.** In an experiment the app is reset once per break configuration and every arm then runs on the same app. After a published post the app keeps the "Add AI label" switch on in memory
+(not in the DOM on the feed, so `goHome()` could not turn it off). `healed`/`hybrid` check "already true" first; `llm-only` has no such check, so its correct click flipped the switch off and the
+step was scored `failed-silent`: **0% on the clean app, always at `setting.toggle`**. `model-verified` alternated (about 50%). Proof: `llm-only` on a fresh page, same model and cache, was 9/9.
+**Fixed.** `clearLeftoverSwitch()` in `fyp-mvp/harness.js`, called from `resetApp()`. Probe: switch off at the caption screen after a reset. Regression checks pass (9/9, B1+B4 9/9, B8 honest stop).
+**Consequence.** Every published model-arm table before this (semantic_n10, inject_n10, vision_*_n5, learn) and rules_full_n10 (harness hash changed) were re-run; the invalid versions were deleted so nothing citable
+carries the bug. Withdrawn claims: "a bare model fails on a clean app", "llm-only follows planted labels in B11 alone", the poster line "a bare model obeys them (0/10)".
