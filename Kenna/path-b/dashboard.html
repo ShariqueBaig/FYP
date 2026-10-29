@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kenna Live</title>
+<style>
+:root{--bg:#0e0f13;--s1:#15171c;--s2:#1b1e25;--bd:#2a2e38;--tx:#e7e9ee;--mu:#9aa0b0;--ac:#6d8bff;--ok:#3ddc97;--bad:#ff6b6b;--warn:#ffb454}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,"Segoe UI",sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+header h1{font-size:18px;margin:0 auto 0 0}header small{color:var(--mu);font-weight:400;margin-left:8px}
+select,button{font:inherit;color:var(--tx);background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:7px 12px}
+button{cursor:pointer}button.pri{background:#3f5fd9;border-color:#3f5fd9;color:#fff;font-weight:600}button:disabled{opacity:.5;cursor:default}
+button.link{background:none;border:0;color:var(--ac);padding:2px 6px;font-size:13px}
+.badge{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--bd);color:var(--mu)}.badge.stub{color:var(--warn);border-color:var(--warn)}.badge.live{color:var(--ok);border-color:var(--ok)}
+main{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:20px;padding:20px;max-width:1300px;margin:0 auto}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+.phone{position:relative;background:#000;border:2px solid var(--bd);border-radius:28px;overflow:hidden;aspect-ratio:1080/2400;width:100%}
+.phone img{width:100%;height:100%;display:block;object-fit:fill}
+.box{position:absolute;border:3px solid var(--ac);background:rgba(109,139,255,.18);border-radius:6px;transition:all .25s;pointer-events:none}
+.box.tap{border-color:var(--warn);background:rgba(255,180,84,.28);box-shadow:0 0 0 6px rgba(255,180,84,.25)}
+.box.ok{border-color:var(--ok);background:rgba(61,220,151,.22)}.box.bad{border-color:var(--bad);background:rgba(255,107,107,.22)}
+.box span{position:absolute;left:0;top:-22px;font-size:11px;padding:1px 6px;border-radius:4px;color:#fff;background:#222;white-space:nowrap}
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.card h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin:0 0 8px;font-weight:600;display:flex;align-items:center;gap:8px}
+.card h2 .sp{margin-left:auto}
+#scene b{font-size:18px}#scene p{margin:4px 0 0;color:var(--mu)}
+.pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:99px;border:1px solid var(--bd);color:var(--mu);margin-right:6px;vertical-align:middle}
+.pill.exp-ok{color:var(--ok);border-color:var(--ok)}.pill.exp-stop{color:var(--warn);border-color:var(--warn)}.pill.mdl{color:var(--ac);border-color:var(--ac)}
+.ladder{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px}
+.rung{flex:1 0 82px;padding:8px 6px;border-radius:10px;border:1px solid var(--bd);background:var(--s2);text-align:center;font-size:13px}
+.rung i{display:block;font-style:normal;font-size:11px;color:var(--mu)}
+.rung small{display:block;color:var(--mu);font-size:11px;min-height:15px}
+.arrow{flex:0 0 18px;align-self:center;text-align:center;color:var(--mu)}
+.rung.skip{background:var(--bg)}.rung.amb{border-color:var(--warn)}.rung.try{border-color:var(--ac);box-shadow:0 0 0 2px rgba(109,139,255,.3)}
+.rung.win{border-color:var(--ok);background:rgba(61,220,151,.12)}.rung.lose{border-color:var(--bad)}
+.hint{color:var(--mu);font-size:13px;margin:8px 0 0}
+.think{font-size:15px;min-height:48px}.think .conf{color:var(--mu)}
+.result{padding:12px 16px;border-radius:12px;font-weight:600;display:none}
+.result.ok{display:block;background:rgba(61,220,151,.14);border:1px solid var(--ok)}
+.result.stop{display:block;background:rgba(255,180,84,.14);border:1px solid var(--warn)}
+.result small{display:block;font-weight:400;color:var(--mu)}
+#log{max-height:220px;overflow:auto;font:12.5px/1.6 ui-monospace,Consolas,monospace}
+#log div{border-bottom:1px solid var(--bd);padding:2px 0}#log .t{color:var(--mu)}
+.sum{display:flex;gap:10px;flex-wrap:wrap}.sum div{flex:1 1 90px;text-align:center;padding:8px;border-radius:10px;background:var(--s2)}.sum b{display:block;font-size:20px}
+.sum span{font-size:11px;color:var(--mu)}
+.pick{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-bottom:1px solid var(--bd);cursor:pointer}
+.pick:last-child{border-bottom:0}.pick input{margin-top:5px;width:16px;height:16px}.pick .d{color:var(--mu);font-size:13px}
+.pick.cur{background:rgba(109,139,255,.12);border-radius:8px}.pick.done-ok .n::after{content:" \2713";color:var(--ok)}.pick.done-bad .n::after{content:" \2717";color:var(--bad)}
+.res{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:14px}.res .g{margin-left:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{color:var(--mu);font-weight:600;font-size:12px}
+details summary{cursor:pointer;color:var(--mu);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+</style></head><body>
+<header>
+  <h1>Kenna live <small>intent-aware, self-healing automation</small></h1>
+  <span class="badge" id="model">model: not started</span>
+  <label>Model <select id="sem"><option value="offline">offline stand-in (not a real model)</option><option value="openrouter">openrouter (real model)</option><option value="anthropic">anthropic (real model)</option><option value="none">no model</option></select></label>
+  <label>Speed <select id="pace"><option value="0.5">fast</option><option value="1.6" selected>demo</option><option value="3">slow</option></select></label>
+  <button class="pri" id="go">&#9654; Run selected</button><button id="stop">Stop</button>
+</header>
+<main>
+  <div><div class="phone"><img id="scr" src="/screen.png" alt="Live emulator screen"><div id="boxes"></div></div></div>
+  <div>
+    <div class="card"><h2>Choose tests <span class="sp"><button class="link" id="all">all</button><button class="link" id="none">none</button></span></h2><div id="picks">Loading...</div></div>
+    <div class="card" id="scene"><h2>Now</h2><b>Pick tests, then press Run selected</b><p>Make sure the emulator is visible and the phone is on the Settings app.</p></div>
+    <div class="card"><h2>The ladder: ways to find the control, tried in this order</h2><div class="ladder" id="ladder"></div>
+      <p class="hint">Each way counts only if it points at exactly one control. After every tap the next screen is checked; if nothing changed, the next way is tried. The model is asked only after the free ways fail.</p></div>
+    <div class="card"><h2>Thinking</h2><div class="think" id="think">Waiting.</div></div>
+    <div class="result" id="result"></div>
+    <div class="card" style="margin-top:14px"><h2>This run</h2><div id="runres" class="hint">Nothing yet.</div>
+      <div class="sum" style="margin-top:10px"><div><b id="s-exp">0/0</b><span>as expected</span></div><div><b id="s-ok">0</b><span>completed</span></div><div><b id="s-stop">0</b><span>stopped honestly</span></div><div><b id="s-wasted">0</b><span>wasted taps</span></div><div><b id="s-calls">0</b><span>model calls</span></div></div></div>
+    <div class="card"><h2>Evidence behind it (measured earlier, not this run)</h2>
+      <table><tr><th>Question</th><th>Result</th><th>Where</th></tr>
+      <tr><td>Recorded script vs ladder, web app, UI changed</td><td>script 0% [0-28], ladder 100% [72-100] (N=10 per cell, 12 configs)</td><td>results/published/rules_full_n10</td></tr>
+      <tr><td>Model helper, web, wording and layout changed</td><td>rules alone 0%, hybrid 100% [72-100]; a bare model 0% with silent wrong taps (qwen3.7-flash, N=10)</td><td>results/published/semantic_n10_qwen37flash</td></tr>
+      <tr><td>Android Settings in French (real drift)</td><td>rules 2/10 = 20%, hybrid 10/10 = 100%</td><td>results/published/android_qual_qwen37flash</td></tr>
+      <tr><td>Android controls with no accessible name</td><td>2% (78% by own attributes alone)</td><td>path-b/dumps/sessions</td></tr>
+      <tr><td>Automated unit checks</td><td>86+ counted, all passing</td><td>agent/*.test.mjs, path-b selftests</td></tr></table>
+      <p class="hint">Limits: one mock web app, stock Android Settings, one real model so far, no user study. The offline stand-in is never a model result.</p></div>
+    <div class="card"><details><summary>Log</summary><div id="log"></div></details></div>
+  </div>
+</main>
+<script>
+const ROUTES=["resource-id","content-desc","text","scoped","learned","semantic","geometry"];
+const NAMES={"resource-id":"id","content-desc":"label","text":"text","scoped":"container","learned":"remembered","semantic":"model","geometry":"position"};
+let since=0,run=false,sc,scenes=[],cur=null,sel=new Set();
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function resetScore(){sc={ok:0,stop:0,wasted:0,calls:0,exp:0,done:0,rows:[]};score();$('runres').textContent='Nothing yet.'}
+function ladderReset(){$('ladder').innerHTML=ROUTES.map((r,i)=>(i?'<span class="arrow">&rsaquo;</span>':'')+`<div class="rung" id="r-${r}"><i>${i+1}</i>${NAMES[r]}<small></small></div>`).join('')}
+function rung(r,cls,txt){const e=$('r-'+r);if(!e)return;e.className='rung '+cls;e.querySelector('small').textContent=txt||''}
+function box(b,cls){$('boxes').innerHTML=b?`<div class="box ${cls||''}" style="left:${b.x0*100}%;top:${b.y0*100}%;width:${(b.x1-b.x0)*100}%;height:${(b.y1-b.y0)*100}%"><span>${esc(b.label)}</span></div>`:''}
+function log(t,x){const d=document.createElement('div');d.innerHTML=`<span class="t">${new Date(t*1000).toLocaleTimeString()}</span> ${x}`;$('log').prepend(d)}
+function think(h){$('think').innerHTML=h}
+const expPill=x=>x==='success'?'<span class="pill exp-ok">expected: completes</span>':'<span class="pill exp-stop">expected: stops honestly</span>';
+function renderPicks(){
+  $('picks').innerHTML=scenes.map(s=>`<label class="pick" id="p-${s.id}"><input type="checkbox" data-id="${s.id}" ${sel.has(s.id)?'checked':''}><div><span class="n"><b>${s.id}. ${esc(s.name)}</b></span> ${expPill(s.expect)}${s.model?'<span class="pill mdl">uses the model</span>':''}<div class="d">${esc(s.say)}</div></div></label>`).join('');
+  $('picks').querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?sel.add(+i.dataset.id):sel.delete(+i.dataset.id);try{localStorage.setItem('kenna-sel',JSON.stringify([...sel]))}catch(e){}$('go').disabled=run||!sel.size});
+  $('go').disabled=run||!sel.size}
+function score(){$('s-exp').textContent=sc.exp+'/'+sc.done;$('s-ok').textContent=sc.ok;$('s-stop').textContent=sc.stop;$('s-wasted').textContent=sc.wasted;$('s-calls').textContent=sc.calls}
+function rows(){$('runres').innerHTML=sc.rows.map(r=>`<div class="res"><span>${esc(r.title)}</span><span class="g">${r.out==='success'?'completed':'stopped'} &middot; ${r.asExpected?'<span style="color:var(--ok)">as expected &#10003;</span>':'<span style="color:var(--bad)">not as expected &#10007;</span>'}</span></div>`).join('')}
+function on(e){
+  switch(e.event){
+  case 'run-start': resetScore();$('log').innerHTML='';$('result').className='result';
+    $('model').textContent='model: '+e.model;$('model').className='badge '+(e.stub?'stub':(e.model==='none'?'':'live'));log(e.t,'run started, model = '+esc(e.model)); break;
+  case 'scene': cur=e;ladderReset();box(null);$('result').className='result';
+    document.querySelectorAll('.pick').forEach(p=>p.classList.remove('cur'));const pe=$('p-'+e.id);if(pe)pe.classList.add('cur');
+    $('scene').innerHTML=`<h2>Now</h2><span class="pill">test ${e.n} of ${e.total}</span>${expPill(e.expect)}<br><b>${esc(e.title)}</b><p>${esc(e.say)}</p>`;think('Reading the screen...');log(e.t,'<b>'+esc(e.title)+'</b>'); break;
+  case 'intent-start': think(`Goal: <b>${esc(e.goal)}</b><br><span class="conf">Looking at ${e.controls} controls on screen.${e.success?' Success means: '+esc(e.success):''}</span>`); break;
+  case 'route': { const r=e.route;
+    if(e.hits===0) rung(r,'skip',r==='semantic'?'no answer':'no match');
+    else if(!e.usable) rung(r,'amb',e.hits+' matches: unsure');
+    else rung(r,'try',e.hits===1?'1 match':e.hits+' picks');
+    if(r!=='semantic'||e.hits===0) think(e.hits===0?`Way ${ROUTES.indexOf(r)+1}, <b>${NAMES[r]}</b>: finds nothing${r==='semantic'?' (no model, or no answer)':''}.`:(e.usable?`Way ${ROUTES.indexOf(r)+1}, <b>${NAMES[r]}</b>: points at exactly one control.`:`Way ${ROUTES.indexOf(r)+1}, <b>${NAMES[r]}</b>: matches ${e.hits} controls, so it is not trusted.`));
+    log(e.t,`way ${ROUTES.indexOf(r)+1} <b>${NAMES[r]}</b>: ${e.hits} candidate(s)`); break; }
+  case 'model-ask': rung('semantic','try','asking...');think(`The rules cannot read this screen. Asking the model, showing it ${e.options} controls. It may only answer with a number from that list.`);log(e.t,'model asked ('+e.options+' options)'); break;
+  case 'model-answer': if(e.error){think('The model call failed: '+esc(e.error));rung('semantic','lose','failed')}
+    else{const p=e.picks[0];think(p?`The model suggests <b>${esc(p.label)}</b> <span class="conf">(confidence ${p.confidence==null?'?':Math.round(p.confidence*100)+'%'}). Only a suggestion: it will be tapped, then checked.</span>`:'The model named nothing.');
+      rung('semantic',p?'try':'skip',p?e.picks.length+' pick(s)':'nothing')}
+    log(e.t,'model answered: '+esc(JSON.stringify(e.picks.map(p=>p.label)))); break;
+  case 'act': box(e,'tap');window._last=e;think(`Tapping <b>${esc(e.label)}</b> via way <b>${NAMES[e.route.split('[')[0]]}</b>, then checking the next screen.`);rung(e.route.split('[')[0],'try','tapped');log(e.t,'tap '+esc(e.label)); break;
+  case 'check': { const r=e.route.split('[')[0]; box(window._last,e.ok?'ok':'bad'); rung(r,e.ok?'win':'lose',e.ok?'worked':'no effect');
+    think(e.ok?`&#10003; Check passed${e.says?': '+esc(e.says):''}`:`&#10007; Check failed: the screen did not change as expected. That tap is counted as wrong; trying the next way.`);log(e.t,(e.ok?'check OK':'check FAILED')); break; }
+  case 'intent-end': { sc.wasted+=e.wasted;sc.calls+=e.model_calls;const ok=e.outcome==='success';ok?sc.ok++:sc.stop++;sc.done++;
+    const asExp=cur&&((cur.expect==='success')===ok);if(asExp)sc.exp++;sc.rows.push({title:cur?cur.title:'',out:e.outcome,asExpected:asExp});score();rows();box(null);
+    const pe=cur&&$('p-'+cur.id);if(pe){pe.classList.remove('cur');pe.classList.add(asExp?'done-ok':'done-bad')}
+    const n=e.detail.replace(/^.*none achieved the goal: /,'').split(', ').length;
+    const r=$('result');r.className='result '+(ok?'ok':'stop');
+    r.innerHTML=ok?`&#10003; Done via the <b>${NAMES[e.route.split('[')[0]]}</b> way<small>${e.wasted} wasted tap(s), ${e.model_calls} model call(s). ${asExp?'As expected.':'Not what was expected.'}</small>`
+      :`&#9888; Stopped honestly. Nothing was guessed.<small>Tried all ${n} ways and none found the control, so it told the user instead of tapping at random. ${asExp?'This is the expected result.':'This was NOT expected.'}</small>`;
+    log(e.t,'<b>'+(ok?'success':'stopped honestly')+'</b>'); break; }
+  case 'run-end': log(e.t,'run finished'); think('Run finished.'); break;
+  }
+}
+async function poll(){try{const r=await (await fetch('/events?since='+since)).json();since=r.next;r.events.forEach(on);run=r.running;$('go').disabled=run||!sel.size}catch(e){}setTimeout(poll,350)}
+function shot(){$('scr').src='/screen.png?'+Date.now()}
+$('scr').onload=()=>setTimeout(shot,run?250:1200);$('scr').onerror=()=>setTimeout(shot,2000);
+$('go').onclick=async()=>{since=0;ladderReset();document.querySelectorAll('.pick').forEach(p=>p.classList.remove('done-ok','done-bad','cur'));
+  await fetch(`/start?semantic=${$('sem').value}&pace=${$('pace').value}&scenes=${[...sel].sort().join(',')}`)};
+$('stop').onclick=()=>fetch('/stop');
+$('all').onclick=()=>{scenes.forEach(s=>sel.add(s.id));renderPicks()};$('none').onclick=()=>{sel.clear();renderPicks()};
+(async()=>{resetScore();ladderReset();
+  try{scenes=await (await fetch('/scenes')).json()}catch(e){scenes=[]}
+  let saved=null;try{saved=JSON.parse(localStorage.getItem('kenna-sel'))}catch(e){}
+  sel=new Set((Array.isArray(saved)&&saved.length?saved:scenes.map(s=>s.id)).filter(i=>scenes.some(s=>s.id===i)));
+  renderPicks();poll();shot()})();
+</script></body></html>

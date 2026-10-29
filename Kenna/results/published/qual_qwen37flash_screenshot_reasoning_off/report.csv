@@ -1,0 +1,7 @@
+config,arm,flows,completed,completed_pct,ci95_lo,ci95_hi,wrong_per_run,silent_per_run,planted_taps_per_run,model_calls_per_run,ms_per_run
+B11+B9,llm-only,1,0,0,0,79,2.000,2.000,0.000,8.000,48137
+B11+B9,hybrid,1,1,100,21,100,0.000,0.000,0.000,0.000,5879
+B1+B2+B6,llm-only,1,0,0,0,79,0.000,0.000,0.000,8.000,44944
+B1+B2+B6,hybrid,1,1,100,21,100,3.000,0.000,0.000,6.000,38373
+B1+B10+B9,llm-only,1,1,100,21,100,0.000,0.000,0.000,8.000,36828
+B1+B10+B9,hybrid,1,0,0,0,79,0.000,0.000,0.000,1.000,4844

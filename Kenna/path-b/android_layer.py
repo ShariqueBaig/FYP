@@ -75,6 +75,30 @@ class Row:
     semantic_calls: int = 0
 
 
+def emit(event, **kw):
+    """Append one JSON line to $FYP_EVENTS (read by dashboard.py). No-op when unset. FYP_PACE=<seconds> slows
+    the run after each action so an audience can follow it."""
+    path = os.environ.get("FYP_EVENTS")
+    if not path:
+        return
+    import time as _t
+    try:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(dict(kw, event=event, t=_t.time())) + chr(10))
+    except OSError:
+        pass
+    if event in ("act", "check", "intent-end"):
+        try:
+            _t.sleep(float(os.environ.get("FYP_PACE", "0")))
+        except ValueError:
+            pass
+
+
+def _box(n, screen):
+    return {"x0": n.bounds[0] / screen[0], "y0": n.bounds[1] / screen[1], "x1": n.bounds[2] / screen[0], "y1": n.bounds[3] / screen[1],
+            "label": (n.text or n.name or n.desc or "")[:60]}
+
+
 def controls(nodes):
     """What the harness may act on: clickable, editable or checkable, with a real box."""
     return [n for n in nodes if n.onscreen and n.displayed and
@@ -493,15 +517,19 @@ class Layer:
             if not self.semantic:
                 return []
             self.semantic_calls += 1
+            emit("model-ask", intent=it.id, options=len(cs))
             try:
                 res = self.semantic(build_payload(it, cs, nodes))
             except Exception as e:                            # noqa: BLE001
                 SEMANTIC_ERRORS["n"] += 1
                 SEMANTIC_ERRORS["last"] = str(e)[:160]
+                emit("model-answer", intent=it.id, error=str(e)[:160], picks=[])
                 return []
             ranked = [r for r in res.get("ranked", []) if isinstance(r.get("i"), int) and 0 <= r["i"] < len(cs)]
             if it.irreversible:
                 ranked = [r for r in ranked[:1] if r.get("confidence", 0) >= MIN_CONF_IRREVERSIBLE]
+            sc = _screen(nodes)
+            emit("model-answer", intent=it.id, picks=[dict(_box(cs[r["i"]], sc), i=r["i"], confidence=r.get("confidence")) for r in ranked[:SEMANTIC_TOP]])
             return [cs[r["i"]] for r in ranked[:SEMANTIC_TOP]]
         if route == "learned" and not (self.use_memory and (self.mem.get(it.id) or {}).get("learned")):
             return []
@@ -514,14 +542,17 @@ class Layer:
         cs = controls(nodes)
         if it.capture:
             it.capture(nodes)
+        emit("intent-start", intent=it.id, goal=it.desc, success=it.success_desc, controls=len(cs), routes=ROUTES)
         for route in ROUTES:
             hits = self._candidates(route, it, cs, nodes)
             multi = route == "semantic"
+            emit("route", intent=it.id, route=route, hits=len(hits), usable=multi or len(hits) == 1)
             if not multi and len(hits) != 1:
                 attempts.append(f"{route}({len(hits)})")
                 continue
             for j, n in enumerate(hits):
                 tag = route + (f"[{j}]" if multi else "")
+                emit("act", intent=it.id, route=tag, **_box(n, _screen(nodes)))
                 try:
                     if it.action == "type":
                         self.driver.type(n, it.value)
@@ -532,19 +563,25 @@ class Layer:
                     wasted += 1
                     continue
                 after = self.driver.dump()
-                if it.success(after):
+                ok = it.success(after)
+                emit("check", intent=it.id, route=tag, ok=bool(ok), says=it.success_desc)
+                if ok:
                     if self.use_memory and route in ("semantic", "learned"):
                         self.mem.setdefault(it.id, {})["learned"] = describe(n, _screen(nodes))
-                    return Row(it.id, "success", route=tag, failed_actions=wasted,
-                               semantic_calls=self.semantic_calls - calls0,
-                               detail="recovered on %s after: %s" % (tag, ", ".join(attempts)) if attempts else it.success_desc)
+                    row = Row(it.id, "success", route=tag, failed_actions=wasted,
+                              semantic_calls=self.semantic_calls - calls0,
+                              detail="recovered on %s after: %s" % (tag, ", ".join(attempts)) if attempts else it.success_desc)
+                    emit("intent-end", intent=it.id, outcome=row.outcome, route=row.route, wasted=wasted, model_calls=row.semantic_calls, detail=row.detail)
+                    return row
                 attempts.append(f"{tag}(no effect)")
                 wasted += 1
                 nodes = after
                 cs = controls(nodes)
-        return Row(it.id, "failed-absent", route="none", failed_actions=wasted,
-                   semantic_calls=self.semantic_calls - calls0,
-                   detail="every route was tried and none achieved the goal: " + ", ".join(attempts))
+        row = Row(it.id, "failed-absent", route="none", failed_actions=wasted,
+                  semantic_calls=self.semantic_calls - calls0,
+                  detail="every route was tried and none achieved the goal: " + ", ".join(attempts))
+        emit("intent-end", intent=it.id, outcome=row.outcome, route=row.route, wasted=wasted, model_calls=row.semantic_calls, detail=row.detail)
+        return row
 
 
     def run_llm_only(self, it: Intent) -> Row:

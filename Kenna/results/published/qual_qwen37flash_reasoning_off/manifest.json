@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-29T10:19:59.638Z",
+  "git": {
+    "commit": "05cdf50154b7551d9f520ad19db0bb441a3b6e78",
+    "dirty": true
+  },
+  "harnessSha256": "18563d0f6c4b5b1b1d09de00c78ac0bc88230cd70d996e097985f58a0b7e6720",
+  "command": "fyp.mjs experiment --n 1 --set qual --arms healed,llm-only,model-verified,hybrid --semantic openrouter --semantic-model qwen/qwen3.7-flash --semantic-cache agent/results/qualification/qwen_qwen3_7-flash/cache_web_noreason.json --semantic-log agent/results/qualification/qwen_qwen3_7-flash/calls_web_noreason.jsonl --out agent/results/qualification/qwen_qwen3_7-flash/web_noreason",
+  "set": "qual",
+  "arms": [
+    "healed",
+    "llm-only",
+    "model-verified",
+    "hybrid"
+  ],
+  "n": 1,
+  "semantic": {
+    "enabled": true,
+    "provider": "openrouter:qwen/qwen3.7-flash",
+    "calls": 53,
+    "errors": 0,
+    "cacheHits": 10,
+    "inputTokens": 93982,
+    "outputTokens": 4534,
+    "modelMs": 77540
+  },
+  "valid": true,
+  "invalidReason": null,
+  "env": "node v24.11.1, win32",
+  "semanticBridge": {
+    "calls": 43,
+    "cacheHits": 10,
+    "errors": 0,
+    "lastError": "",
+    "costUsd": 0.003206474
+  },
+  "viewport": "410x779"
+}

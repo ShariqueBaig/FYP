@@ -1,0 +1,49 @@
+file: results/published/qual_qwen37flash_screenshot_reasoning_off/calls.jsonl
+models: openrouter:qwen/qwen3.7-flash/r-off+shot
+decisions: 31  (live 31, cached 0, failed 0)
+tokens (live, ok): in 71272, out 2733 (of which reasoning 0)   cost: $0.00262 (as reported by the API)
+latency ms (live, ok): p50 4333  p95 8641  max 12225
+answers that named no control: 14/31   top-pick confidence: median 1.00, min 0.95
+
+per intent: calls, mean options offered, mean ms, mean top confidence
+  post.open            5  options  60    4686 ms  conf 0.97
+  gallery.select       4  options  38    5919 ms  conf 0.95
+  compose.next         4  options  38    4275 ms  conf 0.97
+  meta.advance         3  options  29    3948 ms  conf 0.95
+  meta.back            4  options  22    4820 ms  conf 1.00
+  caption.type         4  options  25    3544 ms  conf 0.97
+  setting.toggle       3  options  29    4419 ms  conf 1.00
+  share.post           4  options  25    5874 ms  conf 1.00
+
+every decision (goal -> first pick):
+    post.open        "Open the create-post flow" -> #109 [div] "Start something" conf 1.00
+    gallery.select   "Choose a photo from the gallery" -> #4 [div] "Gallery photo 1" conf 0.95
+    compose.next     "Advance to the caption step" -> #1 [div] "Continue" conf 0.95
+    meta.advance     "Open the "More options" settings" -> #11 [div] "Advanced settings" conf 0.95
+    meta.back        "Go back to the caption step" -> #0 [div] "Return" conf 1.00
+    caption.type     "Type a caption" -> #1 [textarea] "Write something" conf 0.95
+    setting.toggle   "Turn on the "Add AI label" switch" -> #7 [input] "Mark as AI-made" conf 1.00
+    share.post       "Publish the post" -> #12 [div] "Publish" conf 1.00
+    post.open        "Open the create-post flow" -> (none)
+    post.open        "Open the create-post flow" -> #123 [div] "Start something" conf 0.95
+    gallery.select   "Choose a photo from the gallery" -> #4 [div] "Gallery photo 1" conf 0.95
+    compose.next     "Advance to the caption step" -> #1 [div] "Continue" conf 1.00
+    meta.advance     "Open the "More options" settings" -> (none)
+    meta.back        "Go back to the caption step" -> (none)
+    caption.type     "Type a caption" -> #1 [textarea] "Write something" conf 1.00
+    setting.toggle   "Turn on the "Add AI label" switch" -> #7 [input] "Mark as AI-made" conf 1.00
+    share.post       "Publish the post" -> #12 [div] "Publish" conf 1.00
+    post.open        "Open the create-post flow" -> (none)
+    gallery.select   "Choose a photo from the gallery" -> (none)
+    compose.next     "Advance to the caption step" -> (none)
+    meta.advance     "Open the "More options" settings" -> (none)
+    meta.back        "Go back to the caption step" -> (none)
+    caption.type     "Type a caption" -> #16 [div] "Add a comment..." conf 0.95
+    setting.toggle   "Turn on the "Add AI label" switch" -> (none)
+    share.post       "Publish the post" -> (none)
+    post.open        "Open the create-post flow" -> (none)
+    gallery.select   "Choose a photo from the gallery" -> (none)
+    compose.next     "Advance to the caption step" -> (none)
+    meta.back        "Go back to the caption step" -> (none)
+    caption.type     "Type a caption" -> #1 [textarea] "" conf 1.00
+    share.post       "Publish the post" -> #12 [div] "›" conf 1.00

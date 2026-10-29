@@ -15,6 +15,10 @@
 # OpenRouter's free tier allows 50 requests/day (1000/day after adding $10 credit): plan accordingly.
 set -u
 cd "$(dirname "$0")/.."
+# Qualification (qwen/qwen3.7-flash, n=1 on 3 hard configs): thinking tokens off is ~5x faster and half the cost with the same
+# or better outcomes, so it is the default here. Paid keys have no 50/day cap, so no pacing. Override by exporting these first.
+export FYP_SEMANTIC_REASONING="${FYP_SEMANTIC_REASONING:-off}"
+export FYP_SEMANTIC_MIN_GAP_MS="${FYP_SEMANTIC_MIN_GAP_MS:-0}"
 PROVIDER="${1:-openrouter}"
 MODEL="${2:-}"
 SLUG="$(echo "${MODEL:-default}" | tr '/:.' '___')"

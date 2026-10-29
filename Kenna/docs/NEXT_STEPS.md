@@ -1,104 +1,105 @@
-# NEXT_STEPS - pick the project up from here (written 2026-10-29)
+# NEXT_STEPS - pick the project up from here (updated 2026-10-29, evening)
 
-Read `README.md` for what exists, `AGENTS.md` for the rules, `FYP_MVP_PLAN.md` section 15 (last entry) for results.
-This file is only: **what is unfinished, and the exact commands to continue.**
+Read [`../README.md`](../README.md) for what exists, [`../../AGENTS.md`](../../AGENTS.md) for the rules, [`DEFENSE.md`](DEFENSE.md) for claims and evidence,
+[`FYP_MVP_PLAN.md`](FYP_MVP_PLAN.md) section 15 (last entries) for the dated log. This file is only: **what is unfinished, and the exact commands to continue.**
 
 ## State in one paragraph
-Web side: rules ladder + `learned` + `semantic` (model) rungs, route memory that distils model answers, breaks B1-B10,
-arms baseline / healed / llm-only / hybrid, wrong-action and silent-wrong metrics. **No real model has ever been run**
-(no API key was set); every semantic number so far is from `--semantic offline`, a word-overlap stub. Android side:
-`path-b/android_layer.py` works on synthetic dumps; `AdbDriver` has never touched a device.
+Web: rules ladder + `learned` + `semantic` (model) rungs, route memory that distils model answers, 11 breaks (B1-B11), five arms (`baseline`, `healed`,
+`llm-only`, `model-verified`, `hybrid`), wrong/silent-wrong/planted-tap metrics, vision (screenshot with numbered badges), reports with 95% intervals.
+**Measured:** the rules-only claim (C1) at N=10. **Real model:** `qwen/qwen3.7-flash` via OpenRouter on a paid balance; qualified on 3 hard web configs (n=1) and on
+Android Settings including real drift (French: rules 2/10 -> hybrid 10/10). **Real-model protocol (`agent/run_protocol.sh`):** step 1 `semantic_n10` is DONE, valid and published (`results/published/semantic_n10_qwen37flash/`); `inject_n10`, the two vision steps and `learn` were still running at the last check and are NOT yet read or published. Android: `adb_capture.py`, `android_layer.py` and the live tests run on the `kenna` emulator against stock Settings only.
 
 ## Regression check (run after ANY harness change)
 ```bash
 node --check Kenna/fyp-mvp/harness.js
-node Kenna/agent/semantic.test.mjs && node Kenna/agent/nl.test.mjs
-python Kenna/path-b/android_layer.py selftest && python Kenna/path-b/adb_capture.py selftest && python Kenna/path-b/hierdump.py --selftest
+node Kenna/agent/semantic.test.mjs && node Kenna/agent/report.test.mjs && node Kenna/agent/nl.test.mjs
+python Kenna/path-b/android_layer.py selftest && python Kenna/path-b/adb_capture.py selftest && python Kenna/path-b/hierdump.py --selftest && python Kenna/path-b/report_android.py --selftest
 node Kenna/agent/fyp.mjs run                      # 9/9
 node Kenna/agent/fyp.mjs run --breaks B1,B4       # 9/9
 node Kenna/agent/fyp.mjs run --breaks B8          # honest stop at step 1
+python Kenna/tools/check_links.py                 # all markdown links and repo paths resolve
 ```
 
-## 1. Redo the web results with a REAL model (highest priority - nothing is claimable until this)
-The key is found automatically (see README, "Using a real model"): `ANTHROPIC_API_KEY`, else `ANTHROPIC_API_KEY_FILE`, else `Kenna/agent/anthropic.key`.
-- **Human:** put the key in `Kenna/agent/anthropic.key` (the file already exists, git-ignored, one line). Never in chat.
-- **AI agent with its own key (e.g. Synthie):** set `ANTHROPIC_API_KEY` in your process environment and run all of this yourself; do not ask the user for a key.
-Then (the cache means each distinct prompt is paid for once; re-runs are free):
+## 1. The real-model protocol (this is what settles claims C2-C5)
 ```bash
-node Kenna/agent/fyp.mjs experiment --n 5 --set semantic --arms baseline,healed,llm-only,hybrid \
-  --semantic anthropic --semantic-cache Kenna/agent/results/semantic/cache.json --out Kenna/agent/results/semantic/real
-node Kenna/agent/fyp.mjs learn --semantic anthropic --semantic-cache Kenna/agent/results/semantic/cache.json \
-  --runs 8 --drift-at 2 --breaks B1,B9,B10 --out Kenna/agent/results/semantic/real-learn
+bash Kenna/agent/run_protocol.sh openrouter qwen/qwen3.7-flash
 ```
-Model id: `--semantic-model <id>` or `FYP_SEMANTIC_MODEL` (default `claude-haiku-5-5`). State the id in the report.
-Try `--semantic-shot` (sends a screenshot of the mock app; privacy: only ever on the demo app) and compare.
-Quote N >= 5 and say so; the stub run was n=2.
+Resumable: every answer is cached (`agent/results/protocol/cache_*.json`), a step that hits a provider error stops with `valid: false` and a reason, and rerunning the
+same command only repeats the gaps. Steps: `semantic_n10` (drift sets, 5 arms, N=10), `inject_n10` (B11 planted instructions, N=10), `vision_text_n5` and `vision_shot_n5`
+(no words left; text vs screenshot with badges, N=5), then `learn` (does remembering cut model calls). Defaults: thinking tokens off (`FYP_SEMANTIC_REASONING=off`, about 5x faster and half
+the cost in the qualification), no pacing (paid balance). Expected cost: a few cents (about $0.00007 per call with thinking off).
 
-### 1b. STATUS OF THE REAL-MODEL RUNS (read first)
-The only real model run so far is a handful of calls to OpenRouter's free `nvidia/nemotron-3.5-super-vl:free` (one clearly correct
-decision: "Connectivity ..." -> open network settings). Then OpenRouter answered `Rate limit exceeded: free-models-per-day` (50 requests/day
-for free models; the reset time is in the `X-RateLimit-Reset` header, midnight UTC; adding $10 of credit unlocks 1000/day). The provider now
-fails fast on that and the run reports `valid:false`. **To finish the evidence:** add credit (or wait for the reset and run in 50-call
-chunks), then `bash agent/run_protocol.sh openrouter qwen/qwen3.7-flash`. It is resumable: answers are cached.
-Run it for a second model too (`... openrouter <another-free-or-paid-model>`) so the claim is not model-specific.
-The key sits in `agent/openrouter.key` (git-ignored, OneDrive-synced) and was pasted in chat once: **revoke it on openrouter.ai after the project**.
+When a step finishes: read `agent/results/protocol/<step>_*/report.md`, check `valid: yes`, then publish what you cite:
+`node Kenna/agent/report.mjs agent/results/protocol/<step>_qwen_qwen3_7-flash --publish <name>` (copy its `calls.jsonl` log in too, as the qualification folders do).
+Then fill the rows in [`DEFENSE.md`](DEFENSE.md) (C2-C5) with the numbers and **delete the "go/no-go, n=1" wording only for rows that now have N >= 10**.
 
-## 2. Known weaknesses to fix or report
-- B10's moved control is partly covered by the gallery grid, so `compose.next` goes through the keyboard route and `runsToSettle` stays null. Decide: fix B10 (raise z-index / pointer-events) or report it.
-- `gallery.select` picks a different photo each run, so the distilled locator is wrong and the model is asked again (1 call/run floor).
-- `llm-only` fails even on the clean app with the stub; with a real model re-check - this arm is the main comparison and must be fair (see `runLlmOnly`, no confidence gate by design).
-- Silent-wrong for `baseline` is measured post hoc (`effectSeen`); check why it is 1.0 on the clean app (probably `gallery.select` on the already-selected cell).
-- No screenshot/vision rung yet: when no control has any readable word (B1+B2+B9+B10) everything stops honestly.
-- Predicates are hand-written (item 3 of the plan: infer them from a demonstration) - not started.
+**Still to do here**
+- A second model, so the result is not model-specific: `bash agent/run_protocol.sh openrouter <another-model-id>` (check price and image support at openrouter.ai/models first), or `anthropic` with a key.
+- Read the llm-only arm fairly: with the real model it fails the hard web configs, but check it at N=10 before saying so. It has no confidence gate and no stop-on-failure by design (it is the "bare agent" comparison).
+- Quote N and say that repetitions use temperature 0 and a cache (they measure app/harness variation, not model sampling variation).
 
-## 3. Android (path-b) - see 3b for the live setup and results
-Order: capture real dumps -> parse -> measure coverage (hierdump) -> run the layer with `AdbDriver` -> compare arms.
-`android_layer.py`: `python path-b/android_layer.py resolve DUMP.xml '{"id":"x","desc":"Open settings","text":"Settings"}' --semantic offline`.
+**Keys and cost hygiene.** `agent/openrouter.key` is git-ignored but this folder is inside OneDrive (it syncs). Two OpenRouter keys were pasted in chat during development:
+**revoke both at openrouter.ai when the project ends.** A key found in the environment wins over the file. An AI agent with its own key (for example Synthie) sets the variable itself and
+never asks the user for one (README section 7).
 
-## 3b. Android on THIS laptop - DONE and first live results (2026-10-29)
-**Setup (all on D:, outside OneDrive so 5.4 GB is not synced):** SDK at `D:\AndroidSdk` (cmdline-tools, platform-tools, emulator,
-`system-images;android-34;google_apis;x86_64`), AVD `kenna` (Pixel 6, Android 34) in `D:\AndroidSdk\avd`. The C: SDK was left alone.
-Licences were copied from the existing C: SDK (already accepted by the user). The first `sdkmanager` run hung ~26 min at the
-emulator package; killing it and rerunning with `--verbose` to a log worked (`D:\AndroidSdk\sdk-install.log`).
-
-Start / stop the emulator (own terminal; first boot is slow):
+## 2. Android (path-b)
+### Setup on THIS laptop (done 2026-10-29; all on D:, outside OneDrive so 5.4 GB is not synced)
+SDK at `D:\AndroidSdk` (cmdline-tools, platform-tools, emulator, `system-images;android-34;google_apis;x86_64`), virtual device `kenna` (Pixel 6, Android 34) in `D:\AndroidSdk\avd`.
+The old C: SDK was left alone. Start (own terminal; first boot is slow, later boots about a minute):
 ```bash
 ANDROID_SDK_ROOT=D:/AndroidSdk ANDROID_AVD_HOME=D:/AndroidSdk/avd D:/AndroidSdk/emulator/emulator.exe -avd kenna -no-snapshot-save -no-audio -gpu swiftshader_indirect
 ```
 ```bash
 python Kenna/path-b/adb_capture.py devices        # expect emulator-5554  device
 ```
-Stop it with `D:/AndroidSdk/platform-tools/adb.exe emu kill`. Add `-no-window` to run headless.
+Stop: `D:/AndroidSdk/platform-tools/adb.exe emu kill`. Add `-no-window` to run headless.
 
-**What was run on the real emulator (stock apps only: launcher + Settings; NOT Instagram):**
-- `adb_capture.py dump` works first time on Android 34 (`exec-out uiautomator dump /dev/tty` is fine): launcher 34 nodes / 14 controls, Settings 66 / 9. Five real dumps are in `path-b/dumps/` (home, settings, wifi, sound, apps).
-- **Finding 1 (parser artifact, fixed).** `coverage` first said 59% of controls were "anonymous". All 28 of those got their name from a child label (the way TalkBack names a clickable row). Added `Node.name` (own text/desc, else non-clickable descendants' words) and split the report: own-attribute anonymous 59%, of which named by a child 55%, **NAMELESS 4%** (2 of 49). Quote the name-aware figure, and say which you mean.
-- **Finding 2.** Real row names are "title subtitle" ("Network & internet Mobile, Wi-Fi, hotspot"): the text route also accepts a leading-title match (still unique-only).
-- **Finding 3.** Text contains non-ASCII (non-breaking hyphen in "Wi-Fi") and crashed printing on a Windows console; the CLIs now print UTF-8.
-- **Finding 4 (test hygiene).** `am start` re-fronts the last Settings page; a reused state made one case look broken. `live_smoke.py` force-stops Settings first. Any real-device test needs an explicit reset.
-- `python path-b/live_smoke.py --semantic offline`, one intent ("open network & internet"): rules with the exact title -> success on the `text` route, 0 wasted taps; rules with a reworded hint ("Connectivity") -> honest stop, 0 wasted taps; rules + model (offline STAND-IN) -> success on `semantic[0]`, 1 model call. n = 1 each, one app, one emulator, and the model is a stub: plumbing evidence, not a result.
+**Lessons (each cost time):**
+- `-window-scale` does not exist in this emulator version: the launch fails silently. Put a window on screen yourself; with Windows scaling at 125% the usable area is 1536 x 864, so about 340 x 760 at (1150, 10) fits.
+- **Two `adb` versions kill each other's background server** (every call restarts it and can hang). The tools prefer `D:\AndroidSdk\platform-tools\adb.exe`; do not mix with the old C: copy.
+- **A frozen guest** (every `adb shell` hangs, though `adb devices` still lists it) happens after repeated reboots or a language switch. Fix: kill `emulator`, `qemu-system-x86_64` and `adb`, delete `D:\AndroidSdk\avd\kenna.avd\*.lock`, relaunch with `-no-snapshot-load`.
+- **Language persists in two places.** After a French run the UI stays French unless you clear `settings delete system system_locales` AND `setprop persist.sys.locale en-US`, then reboot. `live_drift.py` does this and verifies English **on screen** before and after every condition.
+- `am start` alone re-fronts the last Settings page; force-stop Settings first (the tests do).
+- Licences were copied from the existing C: SDK (already accepted); the first `sdkmanager` run hung at the emulator package, rerunning with `--verbose` to a log worked.
 
-**Still to do on Android:**
-1. A real model on the device: `python path-b/live_smoke.py --semantic anthropic` (key in your terminal env). Compare to the stub.
-2. More intents and screens (back, search, toggle a setting), several sessions each; re-run `coverage` per app build for half-life.
-3. The project's own Expo app on the emulator (an Android build of `insta clone`) instead of only stock apps; then the same 4 arms as the web experiment (rules / hybrid / llm-only / baseline) with real drift. Real drift on stock Settings is not available; a second Android version/image or an app update is the way.
-4. Screenshots as a rung for the 4% nameless controls (not built).
-5. Do NOT point this at Instagram yet (login + bot protection: plan 2.4).
+### What was run on the emulator (stock Settings only; NOT Instagram)
+- `adb_capture.py` dumps work first time on Android 34 (`exec-out uiautomator dump /dev/tty`). **Coverage finding:** judged by the control's own attributes 78% look "anonymous"; once the labels of what is
+  inside a clickable row count, **2% are nameless** (the way TalkBack names a row). `hierdump.py` reports both; quote the name-aware figure and say which you mean.
+- Real row names are "title subtitle" ("Network & internet Mobile, Wi-Fi, hotspot"), so the text route also accepts a leading-title match (still unique-only). On Android 34 an empty field's placeholder is its `text`, not a `hint`.
+- `live_suite.py` (stale hints = simulated drift) and `live_drift.py` (real drift: French, font 1.6) with the real model are published in `../results/published/android_qual_qwen37flash/`.
 
-## 4. Files that matter (this round)
+### Still to do on Android
+1. **Scrolling.** With a large font two rows fall below the fold and no arm scrolls (8/10 for every arm). Add a scroll step to the layer (the accessibility tree says which container scrolls).
+2. **More apps and intents,** more sessions (N >= 10 per cell), and a second Android image or an app update for drift that is not language or font.
+3. **The project's own app on the emulator.** `insta clone/` is a React Native *web* app (reads `window.location`, `localStorage`, behind Firebase login): it cannot run natively without changes in that separate repo. The practical route is the web demo (`?demo=1`) in the emulator's Chrome; the tree Chrome exposes for web content is untested.
+4. **A screenshot rung** for the 2% nameless controls on Android (the web version exists: `--semantic-shot`).
+5. Do NOT point this at Instagram (login and bot protection: plan 2.4).
+
+## 3. Known weaknesses (fix or report)
+- **A later route can re-tap a control an earlier route already tapped** in the same step (no element-level de-duplication; verified in `runIntentCore`). A toggle could flip back. Fix AFTER the real-model protocol finishes (a mid-run harness change would mix versions in one evidence set): keep a set of controls already acted on in the step and skip them.
+- The poster promises more than the repo (fingerprint stealth, touch telemetry, Daraz/OLX, "9/9 under UI chaos"): see `DEFENSE_PREP.md` section 0 and fix the poster before the defense.
+- `gallery.select` picks a different photo each run, so a distilled locator is wrong the next time and the model is asked again (a floor of 1 model call per run).
+- The recorded-script **baseline** makes about 1 silent wrong action per run even on the clean app: it re-clicks fixed controls and the app keeps state between runs (an already-selected photo, a toggle left on). That is a real failure of the baseline, not a bug; the healed arm avoids it through its checks.
+- Predicates are hand-written. `fyp.mjs suggest <routine>` lets a model propose narrower checks (opt-in, stored beside the original); it has only been exercised with the stub.
+- One mock web app plus stock Settings, one real model so far, no user study with screen-reader users, nothing on Instagram.
+- B1+...+B7 together and anything with B8 stop honestly at step 1 by design (the control is unreachable); the plan log recorded this before the model work started.
+
+## 4. Before the defense
+Read [`DEFENSE_PREP.md`](DEFENSE_PREP.md); fix the three poster mismatches in its section 0; verify the `[M]` (not re-checked) product claims in its section 11.
+Revoke the pasted keys; commit (nothing from the model work is committed yet; `git status` shows the moves as renames); run the regression check; rehearse the demo in [`DEFENSE.md`](DEFENSE.md)
+and record a backup video of steps 1-3; open the emulator window on screen before presenting.
+
+## 5. Files that matter
 | file | what |
 |---|---|
-| `fyp-mvp/harness.js` | routes `learned`, `semantic`; `runLlmOnly`; B9, B10; arms in `ARM_RUNNERS`; `wrongOf` metrics |
-| `agent/report.mjs` + `report.test.mjs`, `agent/run_protocol.sh`, `path-b/report_android.py` | manifest + CI tables from raw logs; the resumable real-model protocol |
-| `DEFENSE.md` | claims, evidence status, demo script, questions, limitations |
-| `agent/semantic.mjs` + `semantic.test.mjs` | model bridge: offline stub, anthropic provider, disk cache, flags |
-| `agent/fyp.mjs` | `--semantic`, `--semantic-model`, `--semantic-cache`, `--semantic-shot`, `--arms`, `learn --semantic` |
-| `agent/results/semantic/` | stub results (experiment, learn): plumbing evidence only |
-| `path-b/android_layer.py` | Android ladder + model rung + `AdbDriver` (untested) + synthetic selftest |
-| `path-b/adb_capture.py` | adb capture + parser: devices, dump (retry, fallback, suppressed-window flag, settle), tap/type/key helpers; selftest on canned output **and run live on the emulator (dumps work)** |
-| `path-b/live_smoke.py` | first real intents on stock Settings through `android_layer`; `--semantic offline|anthropic` |
-| `path-b/dumps/` | five real UiAutomator dumps (launcher + Settings) from the `kenna` emulator |
+| `fyp-mvp/harness.js` | routes `learned`, `semantic`; `runLlmOnly`; `ARM_RUNNERS` incl. `model-verified`; breaks B9-B11; vision badges; `teachSuggest`; metrics |
+| `agent/semantic.mjs` | model bridge: `offline` stub, `anthropic`, `openrouter`; cache, pacing, retry, fail-fast, per-decision log |
+| `agent/report.mjs`, `agent/call_log_summary.mjs` | manifest + CI tables; audit of every model decision |
+| `agent/run_protocol.sh`, `agent/qualify.sh`, `path-b/qualify_android.sh` | the protocol and the small fully logged go/no-go runs |
+| `path-b/adb_capture.py`, `android_layer.py`, `live_*.py`, `report_android.py` | Android parser, layer, live tests, report |
+| `results/published/` | committed evidence (see `../results/README.md`) |
+| `tools/check_links.py` | link and path checker for the markdown |
 
 ## Rules that bind every change (AGENTS.md)
-No secrets anywhere. Never quote stub numbers as a model's. A model may only answer with on-screen indices and is judged by
-the success check; irreversible intents need confidence >= 0.8. No Android claim without a device/emulator run.
+No secrets anywhere. Never quote stub numbers as a model's. A model may only answer with on-screen indices and is judged by the success check; irreversible intents need confidence >= 0.8.
+No Android claim beyond what the emulator runs show. A report marked `valid: NO` is never quoted.

@@ -1,0 +1,324 @@
+{
+  "model": "openrouter:qwen/qwen3.7-flash",
+  "sessions": 1,
+  "arms": {
+    "exact": {
+      "ok": 6,
+      "total": 6,
+      "wasted": 0,
+      "model_calls": 0,
+      "silent": 0,
+      "rows": [
+        {
+          "session": 1,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.apps",
+          "ok": true,
+          "routes": [
+            "text"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "back.flow",
+          "ok": true,
+          "routes": [
+            "text",
+            "content-desc"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "content-desc"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "text",
+            "text"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        }
+      ]
+    },
+    "stale": {
+      "ok": 0,
+      "total": 6,
+      "wasted": 0,
+      "model_calls": 0,
+      "silent": 0,
+      "rows": [
+        {
+          "session": 1,
+          "case": "settings.network",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.sound",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.apps",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "back.flow",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "display.dark",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "search.flow",
+          "ok": false,
+          "routes": [
+            "none"
+          ],
+          "outcomes": [
+            "failed-absent"
+          ]
+        }
+      ]
+    },
+    "hybrid": {
+      "ok": 6,
+      "total": 6,
+      "wasted": 0,
+      "model_calls": 8,
+      "silent": 0,
+      "rows": [
+        {
+          "session": 1,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.apps",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "back.flow",
+          "ok": true,
+          "routes": [
+            "semantic[0]",
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "semantic[0]",
+            "semantic[0]"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        }
+      ]
+    },
+    "llm-only": {
+      "ok": 6,
+      "total": 6,
+      "wasted": 0,
+      "model_calls": 8,
+      "silent": 0,
+      "rows": [
+        {
+          "session": 1,
+          "case": "settings.network",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.sound",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "settings.apps",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "back.flow",
+          "ok": true,
+          "routes": [
+            "model-first-choice",
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "display.dark",
+          "ok": true,
+          "routes": [
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success"
+          ]
+        },
+        {
+          "session": 1,
+          "case": "search.flow",
+          "ok": true,
+          "routes": [
+            "model-first-choice",
+            "model-first-choice"
+          ],
+          "outcomes": [
+            "success",
+            "success"
+          ]
+        }
+      ]
+    }
+  },
+  "valid": true,
+  "model_errors": {
+    "n": 0,
+    "last": ""
+  },
+  "note": "stale-hint drift is simulated on the intent side; stub model is not a language model"
+}

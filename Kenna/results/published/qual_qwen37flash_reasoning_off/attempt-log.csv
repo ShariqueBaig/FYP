@@ -1,0 +1,95 @@
+timestamp,arm,config,rep,run,order,intent_id,route_index,route_name,grade,outcome,diagnosis,outcome_detail,ms_elapsed,tree_hash,failed_actions,memory,semantic_calls,effect_seen,injected_acts
+2026-10-29 10:17:04,healed,B1+B10+B9,1,1,1,post.open,6,vision,D,success,,gallery screen appeared - recovered on vision after 4 failed attempt(s),739,20806772,0,,0,,0
+2026-10-29 10:17:07,healed,B1+B10+B9,1,1,2,gallery.select,6,vision[0],D,success,,the chosen photo changed (the preview followed it) - recovered on vision[0] after 4 failed attempt(s),2527,1f4b1897,1,,0,,0
+2026-10-29 10:17:09,healed,B1+B10+B9,1,1,3,compose.next,-1,none,-,failed-absent,S1/S3 no route reaches it,"every route was tried and none achieved the goal: id(0), label(0), text(0), scoped(0), vision(no effect)",1883,1f4b1897,1,,0,,0
+2026-10-29 10:17:13,llm-only,B1+B10+B9,1,2,1,post.open,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2442,,0,,1,true,0
+2026-10-29 10:17:16,llm-only,B1+B10+B9,1,2,2,gallery.select,-1,model-first-choice,C,failed-silent,failed-silent,acted on the model's first choice; the goal did not hold and the arm did not notice,3500,,1,,1,false,0
+2026-10-29 10:17:18,llm-only,B1+B10+B9,1,2,3,compose.next,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2080,,0,,1,true,0
+2026-10-29 10:17:22,llm-only,B1+B10+B9,1,2,4,meta.advance,-1,model-first-choice,C,success,,the model chose a control and it was acted on,3206,,0,,1,true,0
+2026-10-29 10:17:24,llm-only,B1+B10+B9,1,2,5,meta.back,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2139,,0,,1,true,0
+2026-10-29 10:17:26,llm-only,B1+B10+B9,1,2,6,caption.type,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2468,,0,,1,true,0
+2026-10-29 10:17:29,llm-only,B1+B10+B9,1,2,7,setting.toggle,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2481,,0,,1,true,0
+2026-10-29 10:17:31,llm-only,B1+B10+B9,1,2,8,share.post,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2280,,0,,1,true,0
+2026-10-29 10:17:31,llm-only,B1+B10+B9,1,2,9,feed.assert,-1,model-first-choice,C,success,,the published caption is present in the feed,0,,0,,0,true,0
+2026-10-29 10:17:34,model-verified,B1+B10+B9,1,3,1,post.open,5,semantic,C,success,,gallery screen appeared - recovered on semantic after 0 failed attempt(s),2410,ce7d59ae,0,,1,,0
+2026-10-29 10:17:38,model-verified,B1+B10+B9,1,3,2,gallery.select,5,semantic[1],C,success,,the chosen photo changed (the preview followed it) - recovered on semantic[1] after 1 failed attempt(s),4018,a624f6b0,1,,1,,0
+2026-10-29 10:17:40,model-verified,B1+B10+B9,1,3,3,compose.next,5,semantic,C,success,,caption screen appeared - recovered on semantic after 0 failed attempt(s),2264,a624f6b0,0,,1,,0
+2026-10-29 10:17:43,model-verified,B1+B10+B9,1,3,4,meta.advance,5,semantic,C,success,,the more-options screen appeared - recovered on semantic after 0 failed attempt(s),2644,554ddb08,0,,1,,0
+2026-10-29 10:17:44,model-verified,B1+B10+B9,1,3,5,meta.back,5,semantic,C,success,,back on the caption step - recovered on semantic after 0 failed attempt(s),705,1d4a4656,0,,1,,0
+2026-10-29 10:17:45,model-verified,B1+B10+B9,1,3,6,caption.type,5,semantic,C,success,,caption field contains the typed text - recovered on semantic after 0 failed attempt(s),1847,7a310691,0,,1,,0
+2026-10-29 10:17:46,model-verified,B1+B10+B9,1,3,7,setting.toggle,-1,precondition,-,success,,already satisfied - no action needed,121,9796f58b,,,,,
+2026-10-29 10:17:46,model-verified,B1+B10+B9,1,3,8,share.post,5,semantic,C,success,,returned to the feed with the new post in it - recovered on semantic after 0 failed attempt(s),735,9796f58b,0,,1,,0
+2026-10-29 10:17:46,model-verified,B1+B10+B9,1,3,9,feed.assert,-1,predicate,-,success,,the published caption is present in the feed,133,003f23ac,,,,,
+2026-10-29 10:17:50,hybrid,B1+B10+B9,1,4,1,post.open,5,semantic,C,success,,gallery screen appeared - recovered on semantic after 4 failed attempt(s),2501,f44b308b,0,,1,,0
+2026-10-29 10:17:54,hybrid,B1+B10+B9,1,4,2,gallery.select,5,semantic[0],C,success,,the chosen photo changed (the preview followed it) - recovered on semantic[0] after 4 failed attempt(s),4302,f5e6b19b,1,,1,,0
+2026-10-29 10:17:56,hybrid,B1+B10+B9,1,4,3,compose.next,5,semantic,C,success,,caption screen appeared - recovered on semantic after 4 failed attempt(s),2210,f5e6b19b,0,,1,,0
+2026-10-29 10:17:57,hybrid,B1+B10+B9,1,4,4,meta.advance,5,semantic,C,success,,the more-options screen appeared - recovered on semantic after 4 failed attempt(s),911,f65aaf95,0,,1,,0
+2026-10-29 10:17:58,hybrid,B1+B10+B9,1,4,5,meta.back,5,semantic,C,success,,back on the caption step - recovered on semantic after 4 failed attempt(s),717,67cdda69,0,,1,,0
+2026-10-29 10:17:58,hybrid,B1+B10+B9,1,4,6,caption.type,5,semantic,C,success,,caption field contains the typed text - recovered on semantic after 4 failed attempt(s),525,9c8f7561,0,,1,,0
+2026-10-29 10:17:58,hybrid,B1+B10+B9,1,4,7,setting.toggle,-1,precondition,-,success,,already satisfied - no action needed,125,d3046cdb,,,,,
+2026-10-29 10:18:03,hybrid,B1+B10+B9,1,4,8,share.post,5,semantic,C,success,,returned to the feed with the new post in it - recovered on semantic after 4 failed attempt(s),4162,e9678a70,1,,1,,0
+2026-10-29 10:18:03,hybrid,B1+B10+B9,1,4,9,feed.assert,-1,predicate,-,success,,the published caption is present in the feed,130,5deae4b6,,,,,
+2026-10-29 10:18:05,healed,B11+B9,1,5,1,post.open,0,id,A,success,,gallery screen appeared,715,3ee3be64,0,,0,,0
+2026-10-29 10:18:05,healed,B11+B9,1,5,2,gallery.select,0,id,A,success,,the chosen photo changed (the preview followed it),708,62946dad,0,,0,,0
+2026-10-29 10:18:06,healed,B11+B9,1,5,3,compose.next,0,id,A,success,,caption screen appeared,708,62946dad,0,,0,,0
+2026-10-29 10:18:07,healed,B11+B9,1,5,4,meta.advance,0,id,A,success,,the more-options screen appeared,916,0babac94,0,,0,,0
+2026-10-29 10:18:08,healed,B11+B9,1,5,5,meta.back,0,id,A,success,,back on the caption step,706,9245e8a5,0,,0,,0
+2026-10-29 10:18:08,healed,B11+B9,1,5,6,caption.type,0,id,A,success,,caption field contains the typed text,518,0babac94,0,,0,,0
+2026-10-29 10:18:08,healed,B11+B9,1,5,7,setting.toggle,-1,precondition,-,success,,already satisfied - no action needed,128,5bd4382e,,,,,
+2026-10-29 10:18:09,healed,B11+B9,1,5,8,share.post,0,id,A,success,,returned to the feed with the new post in it,729,5bd4382e,0,,0,,0
+2026-10-29 10:18:09,healed,B11+B9,1,5,9,feed.assert,-1,predicate,-,success,,the published caption is present in the feed,133,954387a8,,,,,
+2026-10-29 10:18:12,llm-only,B11+B9,1,6,1,post.open,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2321,,0,,1,true,0
+2026-10-29 10:18:16,llm-only,B11+B9,1,6,2,gallery.select,-1,model-first-choice,C,failed-silent,failed-silent,acted on the model's first choice; the goal did not hold and the arm did not notice,3593,,1,,1,false,1
+2026-10-29 10:18:18,llm-only,B11+B9,1,6,3,compose.next,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2587,,0,,1,true,0
+2026-10-29 10:18:21,llm-only,B11+B9,1,6,4,meta.advance,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2753,,0,,1,true,0
+2026-10-29 10:18:24,llm-only,B11+B9,1,6,5,meta.back,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2400,,0,,1,true,0
+2026-10-29 10:18:26,llm-only,B11+B9,1,6,6,caption.type,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2290,,0,,1,true,0
+2026-10-29 10:18:29,llm-only,B11+B9,1,6,7,setting.toggle,-1,model-first-choice,C,failed-silent,failed-silent,acted on the model's first choice; the goal did not hold and the arm did not notice,3005,,1,,1,false,0
+2026-10-29 10:18:31,llm-only,B11+B9,1,6,8,share.post,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2475,,0,,1,true,0
+2026-10-29 10:18:31,llm-only,B11+B9,1,6,9,feed.assert,-1,model-first-choice,C,success,,the published caption is present in the feed,0,,0,,0,true,0
+2026-10-29 10:18:34,model-verified,B11+B9,1,7,1,post.open,5,semantic,C,success,,gallery screen appeared - recovered on semantic after 0 failed attempt(s),2251,7f2d0df5,0,,1,,0
+2026-10-29 10:18:37,model-verified,B11+B9,1,7,2,gallery.select,5,semantic[0],C,success,,the chosen photo changed (the preview followed it) - recovered on semantic[0] after 0 failed attempt(s),2524,62946dad,0,,1,,0
+2026-10-29 10:18:40,model-verified,B11+B9,1,7,3,compose.next,5,semantic,C,success,,caption screen appeared - recovered on semantic after 0 failed attempt(s),3725,62946dad,0,,1,,0
+2026-10-29 10:18:41,model-verified,B11+B9,1,7,4,meta.advance,5,semantic,C,success,,the more-options screen appeared - recovered on semantic after 0 failed attempt(s),926,0babac94,0,,1,,0
+2026-10-29 10:18:42,model-verified,B11+B9,1,7,5,meta.back,5,semantic,C,success,,back on the caption step - recovered on semantic after 0 failed attempt(s),722,9245e8a5,0,,1,,0
+2026-10-29 10:18:43,model-verified,B11+B9,1,7,6,caption.type,5,semantic,C,success,,caption field contains the typed text - recovered on semantic after 0 failed attempt(s),518,0babac94,0,,1,,0
+2026-10-29 10:18:43,model-verified,B11+B9,1,7,7,setting.toggle,5,semantic,C,success,,the switch reads as on - recovered on semantic after 0 failed attempt(s),721,5bd4382e,0,,1,,0
+2026-10-29 10:18:44,model-verified,B11+B9,1,7,8,share.post,5,semantic,C,success,,returned to the feed with the new post in it - recovered on semantic after 0 failed attempt(s),725,5bd4382e,0,,1,,0
+2026-10-29 10:18:44,model-verified,B11+B9,1,7,9,feed.assert,-1,predicate,-,success,,the published caption is present in the feed,132,5333bc8f,,,,,
+2026-10-29 10:18:46,hybrid,B11+B9,1,8,1,post.open,0,id,A,success,,gallery screen appeared,713,5333bc8f,0,,0,,0
+2026-10-29 10:18:46,hybrid,B11+B9,1,8,2,gallery.select,0,id,A,success,,the chosen photo changed (the preview followed it),706,62946dad,0,,0,,0
+2026-10-29 10:18:47,hybrid,B11+B9,1,8,3,compose.next,0,id,A,success,,caption screen appeared,711,62946dad,0,,0,,0
+2026-10-29 10:18:48,hybrid,B11+B9,1,8,4,meta.advance,0,id,A,success,,the more-options screen appeared,905,5bd4382e,0,,0,,0
+2026-10-29 10:18:49,hybrid,B11+B9,1,8,5,meta.back,0,id,A,success,,back on the caption step,715,9245e8a5,0,,0,,0
+2026-10-29 10:18:49,hybrid,B11+B9,1,8,6,caption.type,0,id,A,success,,caption field contains the typed text,515,0babac94,0,,0,,0
+2026-10-29 10:18:49,hybrid,B11+B9,1,8,7,setting.toggle,-1,precondition,-,success,,already satisfied - no action needed,128,5bd4382e,,,,,
+2026-10-29 10:18:50,hybrid,B11+B9,1,8,8,share.post,0,id,A,success,,returned to the feed with the new post in it,714,5bd4382e,0,,0,,0
+2026-10-29 10:18:50,hybrid,B11+B9,1,8,9,feed.assert,-1,predicate,-,success,,the published caption is present in the feed,133,335a9c59,,,,,
+2026-10-29 10:18:52,healed,B1+B2+B6,1,9,1,post.open,6,vision,D,success,,gallery screen appeared - recovered on vision after 4 failed attempt(s),734,d577f6bb,0,,0,,0
+2026-10-29 10:18:55,healed,B1+B2+B6,1,9,2,gallery.select,6,vision[0],D,success,,the chosen photo changed (the preview followed it) - recovered on vision[0] after 4 failed attempt(s),2503,53e22cde,1,,0,,0
+2026-10-29 10:18:55,healed,B1+B2+B6,1,9,3,compose.next,6,vision,D,success,,caption screen appeared - recovered on vision after 4 failed attempt(s),726,53e22cde,0,,0,,0
+2026-10-29 10:18:56,healed,B1+B2+B6,1,9,4,meta.advance,2,text,B,success,,the more-options screen appeared - recovered on text after 2 failed attempt(s),913,15f8da7c,0,,0,,0
+2026-10-29 10:18:57,healed,B1+B2+B6,1,9,5,meta.back,6,vision,D,success,,back on the caption step - recovered on vision after 4 failed attempt(s),706,ffdc80b0,0,,0,,0
+2026-10-29 10:18:58,healed,B1+B2+B6,1,9,6,caption.type,6,vision,D,success,,caption field contains the typed text - recovered on vision after 4 failed attempt(s),530,60e317ca,0,,0,,0
+2026-10-29 10:18:58,healed,B1+B2+B6,1,9,7,setting.toggle,-1,precondition,-,success,,already satisfied - no action needed,122,c4303844,,,,,
+2026-10-29 10:19:02,healed,B1+B2+B6,1,9,8,share.post,6,vision,D,success,,returned to the feed with the new post in it - recovered on vision after 4 failed attempt(s),4351,43bde75a,2,,0,,0
+2026-10-29 10:19:02,healed,B1+B2+B6,1,9,9,feed.assert,-1,predicate,-,success,,the published caption is present in the feed,142,d0ed9718,,,,,
+2026-10-29 10:19:06,llm-only,B1+B2+B6,1,10,1,post.open,-1,model-first-choice,C,failed-silent,failed-silent,acted on the model's first choice; the goal did not hold and the arm did not notice,3129,,1,,1,false,0
+2026-10-29 10:19:08,llm-only,B1+B2+B6,1,10,2,gallery.select,-1,model-first-choice,C,failed-absent,S1/S3 no route reaches it,the model named no control,1690,,0,,1,,0
+2026-10-29 10:19:11,llm-only,B1+B2+B6,1,10,3,compose.next,-1,model-first-choice,C,failed-silent,failed-silent,acted on the model's first choice; the goal did not hold and the arm did not notice,3309,,1,,1,false,0
+2026-10-29 10:19:14,llm-only,B1+B2+B6,1,10,4,meta.advance,-1,model-first-choice,C,failed-silent,failed-silent,acted on the model's first choice; the goal did not hold and the arm did not notice,3072,,1,,1,false,0
+2026-10-29 10:19:17,llm-only,B1+B2+B6,1,10,5,meta.back,-1,model-first-choice,C,failed-silent,failed-silent,acted on the model's first choice; the goal did not hold and the arm did not notice,3366,,1,,1,false,0
+2026-10-29 10:19:20,llm-only,B1+B2+B6,1,10,6,caption.type,-1,model-first-choice,C,failed-absent,S1/S3 no route reaches it,Illegal invocation,2194,,0,,1,,0
+2026-10-29 10:19:22,llm-only,B1+B2+B6,1,10,7,setting.toggle,-1,model-first-choice,C,failed-absent,S1/S3 no route reaches it,the model named no control,1918,,0,,1,,0
+2026-10-29 10:19:24,llm-only,B1+B2+B6,1,10,8,share.post,-1,model-first-choice,C,success,,the model chose a control and it was acted on,2293,,0,,1,true,0
+2026-10-29 10:19:24,llm-only,B1+B2+B6,1,10,9,feed.assert,-1,model-first-choice,C,success,,the published caption is present in the feed,1,,0,,0,true,0
+2026-10-29 10:19:28,model-verified,B1+B2+B6,1,11,1,post.open,-1,none,-,failed-absent,S1/S3 no route reaches it,every route was tried and none achieved the goal: semantic(no effect),3647,c8a08d19,1,,1,,0
+2026-10-29 10:19:33,hybrid,B1+B2+B6,1,12,1,post.open,6,vision,D,success,,gallery screen appeared - recovered on vision after 5 failed attempt(s),4225,853562cb,1,,1,,0
+2026-10-29 10:19:40,hybrid,B1+B2+B6,1,12,2,gallery.select,6,vision[0],D,success,,the chosen photo changed (the preview followed it) - recovered on vision[0] after 5 failed attempt(s),6439,11d57bf2,2,,1,,0
+2026-10-29 10:19:44,hybrid,B1+B2+B6,1,12,3,compose.next,6,vision,D,success,,caption screen appeared - recovered on vision after 5 failed attempt(s),4191,11d57bf2,1,,1,,0
+2026-10-29 10:19:45,hybrid,B1+B2+B6,1,12,4,meta.advance,2,text,B,success,,the more-options screen appeared - recovered on text after 2 failed attempt(s),916,568d2cf1,0,,0,,0
+2026-10-29 10:19:49,hybrid,B1+B2+B6,1,12,5,meta.back,6,vision,D,success,,back on the caption step - recovered on vision after 5 failed attempt(s),4649,86845a71,0,,1,,0
+2026-10-29 10:19:51,hybrid,B1+B2+B6,1,12,6,caption.type,5,semantic,C,success,,caption field contains the typed text - recovered on semantic after 4 failed attempt(s),2042,fb6563dc,0,,1,,0
+2026-10-29 10:19:52,hybrid,B1+B2+B6,1,12,7,setting.toggle,-1,precondition,-,success,,already satisfied - no action needed,125,97ab8216,,,,,
+2026-10-29 10:19:58,hybrid,B1+B2+B6,1,12,8,share.post,5,semantic,C,success,,returned to the feed with the new post in it - recovered on semantic after 4 failed attempt(s),6555,bf81dc6c,2,,1,,0
+2026-10-29 10:19:58,hybrid,B1+B2+B6,1,12,9,feed.assert,-1,predicate,-,success,,the published caption is present in the feed,141,89584479,,,,,

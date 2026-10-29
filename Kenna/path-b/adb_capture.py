@@ -18,7 +18,7 @@ Things a real `uiautomator dump` does that a naive parser trips on (each is hand
   * the dump is one frame: callers must wait for the screen to settle (see `settled()`)
 
 STATUS: the parser and every quirk above are tested against canned output. A real device or
-emulator has NOT been run yet - see NEXT_STEPS.md.
+emulator has NOT been run yet - see docs/NEXT_STEPS.md.
 """
 
 from __future__ import annotations

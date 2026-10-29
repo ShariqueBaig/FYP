@@ -209,7 +209,9 @@ export function openrouterProvider({ apiKey, model, reasoning = '', fetchImpl = 
       .filter((x) => x && Number.isInteger(x.i))
       .map((x) => ({ i: x.i, confidence: Math.max(0, Math.min(1, Number(x.confidence))) || 0.5 }));
     const u = res.usage || {};
-    return { ranked, provider: 'openrouter:' + model, usage: { inputTokens: u.prompt_tokens || 0, outputTokens: u.completion_tokens || 0, costUsd: Number(u.cost) || 0, reasoningTokens: (u.completion_tokens_details && u.completion_tokens_details.reasoning_tokens) || 0 } };
+    // When the model names nothing, keep the start of what it actually said: the log then shows WHY (prose, refusal, truncation).
+    const rawSnippet = ranked.length ? undefined : String(msg.content || msg.reasoning || '').replace(/\s+/g, ' ').slice(0, 240) + ' [finish=' + ((res.choices && res.choices[0] && res.choices[0].finish_reason) || '?') + ']';
+    return { ranked, provider: 'openrouter:' + model, usage: { inputTokens: u.prompt_tokens || 0, outputTokens: u.completion_tokens || 0, costUsd: Number(u.cost) || 0, reasoningTokens: (u.completion_tokens_details && u.completion_tokens_details.reasoning_tokens) || 0, ...(rawSnippet ? { rawSnippet } : {}) } };
   };
 }
 

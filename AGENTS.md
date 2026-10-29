@@ -1,6 +1,6 @@
 # AGENTS.md - read this first (for Momo and any other coding/ops agent)
 
-> **Full guide to everything built, how to run it and what is tested: [`Kenna/README.md`](Kenna/README.md). What is unfinished and how to continue: [`Kenna/NEXT_STEPS.md`](Kenna/NEXT_STEPS.md).** This file is the rules and the command table.
+> **Full guide to everything built, how to run it and what is tested: [`Kenna/README.md`](Kenna/README.md). What is unfinished and how to continue: [`Kenna/docs/NEXT_STEPS.md`](Kenna/docs/NEXT_STEPS.md).** This file is the rules and the command table.
 
 **Project:** intent-aware, self-healing GUI automation for accessible AI assistants
 (FYP: Sharique Baig, Maira Aijaz, Barkhi Khan). All work lives in `Kenna/`.
@@ -29,7 +29,7 @@ Firebase and no `node_modules` for the app.
 
 | command | what it does |
 |---|---|
-| `describe` | intents, breaks B1-B8, parameters |
+| `describe` | intents, breaks B1-B11, parameters |
 | `status` | current screen, armed breaks, accessibility numbers |
 | `run [--caption T] [--breaks B1,B4] [--arm healed\|baseline] [--shot f.png]` | whole flow, 9 intents, verified in the feed |
 | `intent <id>` | one intent (fresh page each call: only `post.open` is valid cold) |
@@ -40,7 +40,7 @@ Firebase and no `node_modules` for the app.
 | `routines` / `routine <name> [--params '{...}'] [--breaks B1] [--arm baseline]` | list / replay taught routines through the healing ladder |
 | `learn --runs 8 --drift-at 3 --breaks B1,B6` | route-memory experiment: memory on vs off after the UI changes (failed actions, time, runs to settle) |
 | `protect --url <site> --setting "<label>" --n 10 --out results/protection` | how a site's protection layer treats this agent; measures and reports only, never evades |
-| `... --semantic offline\|anthropic` | the **semantic rung**: a model is asked only when every rule route fails. `anthropic` needs `ANTHROPIC_API_KEY` in the environment (never a file, never chat). `offline` is a no-cost lexical stand-in for plumbing tests, **not** a measure of a model. Also `--semantic-model`, `--semantic-cache f.json`, `--semantic-shot` |
+| `... --semantic offline\|anthropic` | the **semantic rung**: a model is asked only when every rule route fails. `anthropic` needs `ANTHROPIC_API_KEY` in the environment or the git-ignored `agent/anthropic.key` (never chat). `offline` is a no-cost lexical stand-in for plumbing tests, **not** a measure of a model. Also `--semantic-model`, `--semantic-cache f.json`, `--semantic-shot` |
 | `experiment --set semantic --arms baseline,healed,llm-only,hybrid` | drift the rules cannot read (B9 reword, B10 relocate); adds wrong-action and silent-wrong-action columns |
 | `experiment --arms baseline,healed,llm-only,model-verified,hybrid`, `--set semantic\|inject\|vision` | arms and drift sets; `inject` plants instructions in labels (B11); `vision` removes all words (with `--semantic-shot`, screenshot + numbered badges) |
 | `--semantic openrouter [--semantic-model id]` | OpenAI-format models via OpenRouter (key: `OPENROUTER_API_KEY` or `agent/openrouter.key`). **A run with `valid:false` had model calls fail: never quote it** |
@@ -52,25 +52,30 @@ Common flags: `--viewport 410x779` (default), `--headed`, `--url <already-served
 
 ## Repo map
 
+Each folder has its own `README.md`. Code folders keep their paths (many scripts depend on them); everything else is filed under `docs/`, `assets/`, `reference/`.
+
 | path | what | edit? |
 |---|---|---|
-| `Kenna/fyp-mvp/harness.js` | **the product**: intents, ladder, breaks, scoring, agent API (`window.__FYP_AGENT`, section 12) | yes - source of truth; the runner serves it live |
-| `Kenna/agent/` | headless CLI, static server, manifest, Momo contract; `semantic.mjs` is the model bridge (`semantic.test.mjs`) | yes |
-| `Kenna/demo/` | prebuilt mock-Instagram web bundle (generated) | **no** - regenerate, do not hand-edit |
+| `Kenna/README.md` | entry page: what it is, folder map, evidence at a glance, commands, keys, tests | yes (keep current) |
+| `Kenna/fyp-mvp/harness.js` | **the product**: intents, ladder, breaks B1-B11, scoring, agent API (`window.__FYP_AGENT`, section 12) | yes - source of truth; the runner serves it live |
+| `Kenna/agent/` | command line, model bridge (`semantic.mjs`), reports (`report.mjs`), protocol scripts, Momo contract, tests | yes |
+| `Kenna/path-b/` | Android: `adb_capture.py` (adb parser), `android_layer.py` (ladder + model rung), live emulator tests, `hierdump.py` (coverage). Run live on the `kenna` emulator (SDK at `D:\AndroidSdk`) against stock Settings only. `live_dumper.py` / `intent_route_layer.py` are the old scaffold | yes |
+| `Kenna/results/published/` | **committed evidence** (manifest + report + raw log per experiment); `agent/results/` is git-ignored working output; `path-b/results/` holds old stub-model Android runs (tracked, not citable as model results) | add via `report.mjs --publish` |
+| `Kenna/docs/` | `DEFENSE.md`, `NEXT_STEPS.md`, `FYP_MVP_PLAN.md` (append to section 15), `SYNTHIE.md`, `PATH_B_GUIDE.md`, the original briefing | yes |
+| `Kenna/tools/check_links.py` | every relative link and repo path in the markdown must resolve | run after moving or renaming a file |
+| `Kenna/demo/`, `Kenna/site/` | prebuilt mock-Instagram web bundle and the deployable copy (generated) | **no** - regenerate, do not hand-edit |
+| `Kenna/assets/` | poster, introduction image, app photos | no |
+| `Kenna/reference/` | a related QA tool (`locator-inspector-plugin-v1.0.2/`); **not** this FYP's contribution | no |
 | `Kenna/insta clone/` | app source - **a separate git repo** (`ShariqueBaig/insta-clone`), git-ignored here | only via its own repo |
-| `Kenna/FYP_MVP_PLAN.md` | decisions, taxonomy S1-S6, progress log. Read section 2 before changing scope | append to section 15 |
-| `Kenna/path-b/` | Android accessibility-tree layer (Phase 2). `hierdump.py` (offline analyzer) and **`android_layer.py`** (intent/route ladder + model rung, `python android_layer.py selftest`) and **`adb_capture.py`** (adb capture + parser, `selftest`) work against saved/canned/synthetic dumps; `AdbDriver` and `adb_capture.py` have run live on the `kenna` emulator (SDK at `D:\AndroidSdk`) against stock Settings only; no Android arms comparison or real-model result exists. `live_dumper.py` now parses but needs Appium; `intent_route_layer.py` is the old scaffold | Phase 2 |
-| `Kenna/PATH_B_GUIDE.md`, `kenna_android_automation_fyp_briefing_v2-1.md` | Android build procedure / original problem statement | reference |
-| `Kenna/locator-inspector-plugin-v1.0.2/` | related QA tool; **not** this FYP's contribution | no |
 
 ## If you are an AI agent with your own Anthropic key (e.g. Synthie)
 
 (Same for OpenRouter: set `OPENROUTER_API_KEY` and use `--semantic openrouter`; free-model accounts are capped at 50 requests/day.)
 You have the key in your backend, so **run the real-model tests yourself; do not ask the user for a key and do not use `agent/anthropic.key`.**
 Set `ANTHROPIC_API_KEY` in the environment of the process that runs the commands (never write it to a file, never print it), then follow
-`Kenna/NEXT_STEPS.md` section 1 with `--semantic anthropic --semantic-cache <file>`: the web `experiment --set semantic --arms ...`, `learn --semantic`,
+`Kenna/docs/NEXT_STEPS.md` section 1 with `--semantic anthropic --semantic-cache <file>`: the web `experiment --set semantic --arms ...`, `learn --semantic`,
 `suggest <routine>`, and on Android `path-b/live_suite.py`, `path-b/live_drift.py` and `path-b/live_smoke.py` with `--semantic anthropic`
-(needs the emulator, see NEXT_STEPS 3b). Report the model id, N, call and token counts; separate "model was wrong and the check caught it" from
+(needs the emulator, see `Kenna/docs/NEXT_STEPS.md` section 3b). Report the model id, N, call and token counts; separate "model was wrong and the check caught it" from
 "model was wrong and nobody noticed" (silent). A human with no agent puts the key in `Kenna/agent/anthropic.key` instead.
 
 ## Rebuilding the demo bundle (only when the app source changed)

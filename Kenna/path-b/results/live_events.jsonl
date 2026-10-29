@@ -1,0 +1,15 @@
+{"model": "offline-lexical STUB", "stub": true, "total": 3, "event": "run-start", "t": 1793274631.096619}
+{"n": 1, "total": 3, "id": 2, "title": "2 - Words changed, model rescues", "say": "The row is now called differently from what was taught. Rules cannot find it, so the model is asked and its pick is checked.", "expect": "success", "event": "scene", "t": 1793274631.0971496}
+{"intent": "settings.network", "goal": "Open the network and internet settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "event": "intent-start", "t": 1793274639.398175}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "event": "route", "t": 1793274639.398175}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "event": "route", "t": 1793274639.3984249}
+{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "event": "route", "t": 1793274639.3984249}
+{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "event": "route", "t": 1793274639.3984249}
+{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "event": "route", "t": 1793274639.3984249}
+{"intent": "settings.network", "options": 9, "event": "model-ask", "t": 1793274639.3991764}
+{"intent": "settings.network", "picks": [{"x0": 0.0, "y0": 0.32083333333333336, "x1": 1.0, "y1": 0.4170833333333333, "label": "Network & internet Mobile, Wi\u2011Fi, hotspot", "i": 2, "confidence": 0.8500000000000001}, {"x0": 0.03888888888888889, "y0": 0.24625, "x1": 0.9611111111111111, "y1": 0.30333333333333334, "label": "Search settings", "i": 1, "confidence": 0.64}, {"x0": 0.825, "y0": 0.11458333333333333, "x1": 0.9416666666666667, "y1": 0.16708333333333333, "label": "Profile picture, double tap to open Google Account", "i": 0, "confidence": 0.6271428571428572}], "event": "model-answer", "t": 1793274639.4021742}
+{"intent": "settings.network", "route": "semantic", "hits": 3, "usable": true, "event": "route", "t": 1793274639.4021742}
+{"intent": "settings.network", "route": "semantic[0]", "x0": 0.0, "y0": 0.32083333333333336, "x1": 1.0, "y1": 0.4170833333333333, "label": "Network & internet Mobile, Wi\u2011Fi, hotspot", "event": "act", "t": 1793274639.4021742}
+{"intent": "settings.network", "route": "semantic[0]", "ok": true, "says": "", "event": "check", "t": 1793274645.4445093}
+{"intent": "settings.network", "outcome": "success", "route": "semantic[0]", "wasted": 0, "model_calls": 1, "detail": "recovered on semantic[0] after: resource-id(0), content-desc(0), text(0), scoped(0), learned(0)", "event": "intent-end", "t": 1793274645.7455263}
+{"n": 2, "total": 3, "id": 3, "title": "3 - Control not there, honest stop", "say": "Nothing on screen matches. The assistant must stop and say so, not tap something random.", "expect": "stop", "event": "scene", "t": 1793274646.0463552}

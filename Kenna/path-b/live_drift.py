@@ -43,8 +43,17 @@ ROWS = [
 ]
 
 
-def adb(*a):
-    return subprocess.run([ADB] + list(a), capture_output=True, text=True, timeout=120)
+def adb(*a, timeout=60):
+    """One adb call, time-boxed: a frozen emulator guest makes `adb shell`/`adb root` hang forever, which used to
+    hang a whole unattended run. A timeout is returned as a failed result (code 124) instead of an exception."""
+    try:
+        return subprocess.run([ADB] + list(a), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess([ADB] + list(a), 124, "", "timeout")
+
+
+def guest_alive():
+    return (adb("shell", "getprop", "sys.boot_completed", timeout=20).stdout or "").strip() == "1"
 
 
 def start_home():
@@ -110,7 +119,7 @@ def english_ui():
 def restore():
     """Back to the healthy English, normal-size build, from ANY state, and PROVE it. The framework keeps the user's
     language in `system_locales`, which beats the persist.sys.locale property after a reboot, so clear both."""
-    adb("root"); time.sleep(2)
+    adb("root", timeout=30); time.sleep(2)
     adb("shell", "settings", "delete", "system", "system_locales")
     adb("shell", "setprop", "persist.sys.locale", "en-US")
     adb("shell", "settings", "put", "system", "font_scale", "1.0")
@@ -124,7 +133,7 @@ def restore():
 def set_condition(c):
     """Apply ONE condition to a clean build (never stacked on the previous one)."""
     if c == "fr":
-        adb("root"); time.sleep(2)
+        adb("root", timeout=30); time.sleep(2)
         adb("shell", "settings", "put", "system", "system_locales", "fr-FR")
         adb("shell", "setprop", "persist.sys.locale", "fr-FR")
         adb("reboot")
@@ -159,10 +168,17 @@ def main(argv):
             if dirty:                      # never stack one condition on the previous one
                 restore()
                 dirty = False
+            if not guest_alive():
+                print(f"[{cond}] the emulator is not responding (adb shell hangs). Cold-restart it (see docs/NEXT_STEPS.md section 3b) and rerun; nothing was measured for this condition.", flush=True)
+                break
             if cond != "en":
                 set_condition(cond)
                 dirty = True
                 print(f"[{cond}] applied; system_locales={locale_now()}", flush=True)
+                took = (not english_ui()) if cond == "fr" else True      # French must really replace the English labels
+                if not took:
+                    print(f"[{cond}] was NOT applied (the screen still shows English): skipping it rather than measure the wrong thing.", flush=True)
+                    continue
             res = {a: {"ok": 0, "total": 0, "wasted": 0, "silent": 0, "model_calls": 0} for a in arms}
             for session in range(1, n + 1):
                 for cid, title, goal in ROWS:

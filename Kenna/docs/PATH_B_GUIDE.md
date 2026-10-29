@@ -4,7 +4,7 @@
 
 This guide is the procedure. It assumes your existing Python rig stays put for the web side (Playwright) and adds a second, Android-side pipeline.
 
-**Companion file:** [`hierdump.py`](hierdump.py) — an offline analyzer for saved hierarchy dumps. It computes the go/no-go measurement, builds and verifies the locator ladder, finds scroll containers, and measures rung survival across app builds. `python3 hierdump.py --selftest` proves it works with no device attached.
+**Companion file:** [`hierdump.py`](../path-b/hierdump.py) — an offline analyzer for saved hierarchy dumps. It computes the go/no-go measurement, builds and verifies the locator ladder, finds scroll containers, and measures rung survival across app builds. `python3 path-b/hierdump.py --selftest` proves it works with no device attached.
 
 ---
 

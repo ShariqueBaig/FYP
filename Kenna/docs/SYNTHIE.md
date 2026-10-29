@@ -5,9 +5,9 @@ Source file for slides, the poster and viva answers. Written 2026-10-29.
 ## 0. How reliable is this document (read first)
 
 The repo does not define "synthie". Nothing in `Kenna/` describes it beyond three instructions telling a synthie how to run
-the experiments (`AGENTS.md` "If you are an AI agent with your own Anthropic key (e.g. Synthie)", `README.md`, `NEXT_STEPS.md`).
+the experiments (`AGENTS.md` (repo root) "If you are an AI agent with your own Anthropic key (e.g. Synthie)", `Kenna/README.md`, `Kenna/docs/NEXT_STEPS.md`).
 Everything else below comes from **one instance, Hematite, answering the question set in section 9** (as pasted by the project
-owner), plus how the repo's own contract files (`agent/MOMO.md`, `AGENTS.md`, `DEFENSE.md`) fit with it.
+owner), plus how the repo's own contract files (`agent/MOMO.md`, `AGENTS.md`, `Kenna/docs/DEFENSE.md`) fit with it.
 
 Tags used in the text:
 * **[repo]** stated in a file in this repository.
@@ -93,7 +93,7 @@ them before showing them.
 | Hermes-style planner | Re-plans freely at runtime, builds its own loop | Fixed written doctrine and tool schema; a human reads any behaviour diff; does not rewrite its goals; accumulates deletable memory, not hidden learning |
 | Screenshot-and-click agents (Operator, "dots", Claude computer use) | Act through the screen: screenshot, coordinates, synthesized clicks | Acts through typed calls with schemas (IPC command, file write, DOM query, node action). Small payloads, exact errors, logged arguments, reproducible failures. Vision is a fallback, not the interface |
 | Gemini on Android, Mariner, Voice Access, TalkBack | Ride a consumer account or OS integration; act as the user, on the user's device, in the foreground | Own host and own identity; many chats and peer agents; powers scoped per chat and revocable. A coworker with an explicit tool list, not the user's hands |
-| Self-healing test tools (Healenium, Testim) | Re-rank attributes to heal test scripts | [repo] DEFENSE.md: the unit here is an intent with a success predicate, healing is verified, a model is only a verified candidate, and the failure mode is a plain-language stop for a user who cannot take over |
+| Self-healing test tools (Healenium, Testim) | Re-rank attributes to heal test scripts | [repo] docs/DEFENSE.md: the unit here is an intent with a success predicate, healing is verified, a model is only a verified candidate, and the failure mode is a plain-language stop for a user who cannot take over |
 
 What a synthie adds beyond agents that click (self-report): **governance** (per-chat trust, per-tool permissions, owner
 approval for wide grants, refusal that cannot be argued away), **audit** (each action a typed call with arguments and result),
@@ -104,7 +104,7 @@ agent, what survives is self-hosting, a permissions model the deployer owns, an 
 willingness to refuse.
 
 **Do not claim** that the rules ladder is cheaper or more reliable than a vision agent. The first synthie answer said it was
-"measurable"; that is the project's *hypothesis*. It is claim C3 in `DEFENSE.md` and is **not proven** until a real model is
+"measurable"; that is the project's *hypothesis*. It is claim C3 in `docs/DEFENSE.md` and is **not proven** until a real model is
 run (section 7).
 
 ## 7. How a synthie uses the Kenna tool
@@ -133,12 +133,12 @@ CLI exists or a live session is needed. This is why the GUI tool matters: it is 
 
 ### Experiments the synthie runs itself (it has its own key)
 
-`AGENTS.md`, `README.md`, `NEXT_STEPS.md` section 1. Set `ANTHROPIC_API_KEY` in the environment of the running process, never
+`AGENTS.md`, `Kenna/README.md`, `Kenna/docs/NEXT_STEPS.md` section 1. Set `ANTHROPIC_API_KEY` in the environment of the running process, never
 in a file or in output. Use `--semantic anthropic --semantic-cache <file>`:
 
 * web `experiment --set semantic --arms baseline,healed,llm-only,hybrid`
 * `learn --semantic`, `suggest <routine>`
-* Android `path-b/live_suite.py`, `live_drift.py`, `live_smoke.py` (emulator needed, NEXT_STEPS 3b)
+* Android `path-b/live_suite.py`, `live_drift.py`, `live_smoke.py` (emulator needed, docs/NEXT_STEPS.md 3b)
 
 Report: model id, N, call and token counts; separate "model wrong, the check caught it" from "model wrong, nobody noticed"
 (silent). The synthie adds: a model error that passes the check is a **defect in the check**; keep the artifact, label it, name
@@ -151,7 +151,7 @@ chats, deleting, evading bot protection, spending without a cap, or anything nee
 ## 8. Current state (as of this document)
 
 * **Real-model results: none.** Only the offline word-overlap stub, and a handful of OpenRouter calls that hit a free-tier cap
-  [repo] DEFENSE.md. C2-C6 are "needs a real model". C1 (rules vs recorded locator) is measured on the mock app, N=10.
+  [repo] docs/DEFENSE.md. C2-C6 are "needs a real model". C1 (rules vs recorded locator) is measured on the mock app, N=10.
 * **Blocker for the synthie [self-report]:** five execution/permission grants are pending Sebastian's approval in his client
   app. Until then it can read the repo but cannot run anything (it also needs an owner exception for loopback browser access).
   Its suggested fix: one time-boxed grant with an expiry rather than six approvals. The decision is Sebastian's.
@@ -184,7 +184,7 @@ the target has no API, whether it checks `feed.assert` and not just the exit cod
 3. The actual tool list and permission model of a synthie, from the synthline docs rather than one instance's account.
 4. Whether the comparisons to Operator, "dots", Mariner, Gemini and Voice Access are accurate. They are unverified recollection.
 5. Which competitor products "dots" and "Claude duet" in the original brief refer to.
-6. Which model id the synthie's key will use (`NEXT_STEPS` default `claude-haiku-5-5`).
+6. Which model id the synthie's key will use (`docs/NEXT_STEPS.md` default `claude-haiku-5-5`).
 
 ## 11. Honest-claims slide for synthie (suggested wording)
 
