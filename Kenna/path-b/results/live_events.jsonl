@@ -13,3 +13,23 @@
 {"intent": "settings.network", "route": "semantic[0]", "ok": true, "says": "", "event": "check", "t": 1793274645.4445093}
 {"intent": "settings.network", "outcome": "success", "route": "semantic[0]", "wasted": 0, "model_calls": 1, "detail": "recovered on semantic[0] after: resource-id(0), content-desc(0), text(0), scoped(0), learned(0)", "event": "intent-end", "t": 1793274645.7455263}
 {"n": 2, "total": 3, "id": 3, "title": "3 - Control not there, honest stop", "say": "Nothing on screen matches. The assistant must stop and say so, not tap something random.", "expect": "stop", "event": "scene", "t": 1793274646.0463552}
+{"intent": "settings.teleporter", "goal": "Open the quantum teleporter settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "event": "intent-start", "t": 1793274654.1847346}
+{"intent": "settings.teleporter", "route": "resource-id", "hits": 0, "usable": false, "event": "route", "t": 1793274654.1847346}
+{"intent": "settings.teleporter", "route": "content-desc", "hits": 0, "usable": false, "event": "route", "t": 1793274654.1857338}
+{"intent": "settings.teleporter", "route": "text", "hits": 0, "usable": false, "event": "route", "t": 1793274654.1857338}
+{"intent": "settings.teleporter", "route": "scoped", "hits": 0, "usable": false, "event": "route", "t": 1793274654.1857338}
+{"intent": "settings.teleporter", "route": "learned", "hits": 0, "usable": false, "event": "route", "t": 1793274654.1857338}
+{"intent": "settings.teleporter", "route": "semantic", "hits": 0, "usable": true, "event": "route", "t": 1793274654.1857338}
+{"intent": "settings.teleporter", "route": "geometry", "hits": 0, "usable": false, "event": "route", "t": 1793274654.1857338}
+{"intent": "settings.teleporter", "outcome": "failed-absent", "route": "none", "wasted": 0, "model_calls": 0, "detail": "every route was tried and none achieved the goal: resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0)", "event": "intent-end", "t": 1793274654.1867313}
+{"n": 3, "total": 3, "id": 5, "title": "5 - Words changed, no model", "say": "The same changed wording as scene 2, but with the model switched off: rules alone cannot read it, so it stops. This is why the model rung exists.", "expect": "stop", "event": "scene", "t": 1793274654.4871156}
+{"intent": "settings.network", "goal": "Open the network and internet settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "event": "intent-start", "t": 1793274662.7133372}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "event": "route", "t": 1793274662.7143347}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "event": "route", "t": 1793274662.7143347}
+{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "event": "route", "t": 1793274662.7143347}
+{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "event": "route", "t": 1793274662.7143347}
+{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "event": "route", "t": 1793274662.7143347}
+{"intent": "settings.network", "route": "semantic", "hits": 0, "usable": true, "event": "route", "t": 1793274662.7153368}
+{"intent": "settings.network", "route": "geometry", "hits": 0, "usable": false, "event": "route", "t": 1793274662.7153368}
+{"intent": "settings.network", "outcome": "failed-absent", "route": "none", "wasted": 0, "model_calls": 0, "detail": "every route was tried and none achieved the goal: resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0)", "event": "intent-end", "t": 1793274662.7153368}
+{"event": "run-end", "t": 1793274663.0164576}
