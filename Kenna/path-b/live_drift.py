@@ -17,6 +17,7 @@ English-only word-overlap stub: expect it to fail in French. That is the stub's 
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -56,9 +57,22 @@ def fg():
     return ac.foreground(RUN)
 
 
+GENERIC_FRAGMENTS = {"ReportFragment", "SupportRequestManagerFragment", "FragmentManager"}
+
+
+def page_id():
+    """Which Settings page is showing, by the NAME of its fragment: the same in every language. (The foreground
+    activity is no use: every row opens the same SubSettings activity, so it cannot tell a wrong row from the
+    right one.)"""
+    out = adb("shell", "dumpsys", "activity", "top").stdout or ""
+    names = [n for n in re.findall(r"#\d+:\s*([A-Za-z0-9_.$]+)\{", out) if n not in GENERIC_FRAGMENTS]
+    return names[0] if names else ""
+
+
 def learn_oracle():
-    """On the healthy English build: which activity does each row open? (language-independent ground truth)"""
-    oracle = {}
+    """On the healthy English build: which page does each row open? Only rows that open a page no other row
+    opens are usable (otherwise a wrong-row tap could pass)."""
+    seen = {}
     for cid, title, goal in ROWS:
         start_home()
         d = ac.settled(RUN)
@@ -67,42 +81,61 @@ def learn_oracle():
             print(f"  oracle: '{title}' not uniquely on screen ({len(hits)}), skipped")
             continue
         ac.tap(RUN, *hits[0].center)
-        time.sleep(2.5)
-        act = fg().split("/")[-1]
-        if HOME_ACT not in act and act:
-            oracle[cid] = act
-    return oracle
-
-
-def set_condition(c):
-    if c == "fr":
-        adb("root"); time.sleep(2)
-        adb("shell", "setprop", "persist.sys.locale", "fr-FR")
-        adb("shell", "setprop", "ctl.restart", "zygote")
-        time.sleep(25)
-    elif c == "font":
-        adb("shell", "settings", "put", "system", "font_scale", "1.6")
-        time.sleep(2)
-
-
-def restore():
-    adb("root"); time.sleep(2)
-    adb("shell", "setprop", "persist.sys.locale", "en-US")
-    adb("shell", "settings", "put", "system", "font_scale", "1.0")
-    adb("shell", "setprop", "ctl.restart", "zygote")
-    time.sleep(25)
-
-
-def locale_now():
-    return (adb("shell", "getprop", "persist.sys.locale").stdout or "").strip() or (adb("shell", "getprop", "ro.product.locale").stdout or "").strip()
+        time.sleep(3)
+        pid = page_id()
+        if pid:
+            seen.setdefault(pid, []).append(cid)
+        else:
+            print(f"  oracle: '{title}' opened a page with no identifiable fragment, skipped")
+    return {ids[0]: pid for pid, ids in seen.items() if len(ids) == 1}
 
 
 def wait_boot():
-    for _ in range(60):
+    time.sleep(15)
+    for _ in range(90):
         if (adb("shell", "getprop", "sys.boot_completed").stdout or "").strip() == "1":
+            time.sleep(10)
             return True
-        time.sleep(2)
+        time.sleep(3)
     return False
+
+
+def english_ui():
+    """True only if Settings really shows English now (checked on screen, not just in a property)."""
+    start_home()
+    names = [n.name for n in ac.settled(RUN).controls]
+    return any(n.startswith("Network & internet") for n in names)
+
+
+def restore():
+    """Back to the healthy English, normal-size build, from ANY state, and PROVE it. The framework keeps the user's
+    language in `system_locales`, which beats the persist.sys.locale property after a reboot, so clear both."""
+    adb("root"); time.sleep(2)
+    adb("shell", "settings", "delete", "system", "system_locales")
+    adb("shell", "setprop", "persist.sys.locale", "en-US")
+    adb("shell", "settings", "put", "system", "font_scale", "1.0")
+    adb("reboot")
+    wait_boot()
+    ok = english_ui() and (adb("shell", "settings", "get", "system", "font_scale").stdout or "").strip() in ("1.0", "1")
+    print("restored to English / 1.0: " + ("verified on screen" if ok else "NOT VERIFIED - check the emulator by hand"), flush=True)
+    return ok
+
+
+def set_condition(c):
+    """Apply ONE condition to a clean build (never stacked on the previous one)."""
+    if c == "fr":
+        adb("root"); time.sleep(2)
+        adb("shell", "settings", "put", "system", "system_locales", "fr-FR")
+        adb("shell", "setprop", "persist.sys.locale", "fr-FR")
+        adb("reboot")
+        wait_boot()
+    elif c == "font":
+        adb("shell", "settings", "put", "system", "font_scale", "1.6")
+        time.sleep(3)
+
+
+def locale_now():
+    return (adb("shell", "settings", "get", "system", "system_locales").stdout or "").strip()
 
 
 def main(argv):
@@ -111,26 +144,32 @@ def main(argv):
     sem, model = None, "none"
     if "--semantic" in argv:
         kind = argv[argv.index("--semantic") + 1]
-        sem = al.offline_semantic if kind == "offline" else al.anthropic_semantic()
-        model = "offline-lexical STUB (English only)" if kind == "offline" else os.environ.get("FYP_SEMANTIC_MODEL", "claude-haiku-5-5")
+        sem, model = al.make_semantic(kind, argv[argv.index("--semantic-model") + 1] if "--semantic-model" in argv else None)
     print("learning the oracle on the English build ...", flush=True)
     oracle = learn_oracle()
     print("oracle:", json.dumps(oracle), flush=True)
+    if len(oracle) < 3:
+        print("too few rows open a distinguishable page; the test would not be meaningful. Stopping.")
+        return 2
     arms = ["rules"] + (["hybrid", "llm-only"] if sem else [])
     results = {}
     try:
+        dirty = False
         for cond in conds:
+            if dirty:                      # never stack one condition on the previous one
+                restore()
+                dirty = False
             if cond != "en":
                 set_condition(cond)
-                wait_boot()
-                print(f"[{cond}] applied; locale={locale_now()}", flush=True)
+                dirty = True
+                print(f"[{cond}] applied; system_locales={locale_now()}", flush=True)
             res = {a: {"ok": 0, "total": 0, "wasted": 0, "silent": 0, "model_calls": 0} for a in arms}
             for session in range(1, n + 1):
                 for cid, title, goal in ROWS:
                     if cid not in oracle:
                         continue
                     want = oracle[cid]
-                    success = lambda ns, want=want: want in fg()          # noqa: E731
+                    success = lambda ns, want=want: page_id() == want     # noqa: E731
                     for arm in arms:
                         start_home()
                         it = al.Intent("drift." + cid, goal, text=title, success=success)
@@ -147,18 +186,20 @@ def main(argv):
     finally:
         if any(c != "en" for c in conds):
             restore()
-            wait_boot()
-            print("restored: locale=%s font_scale=1.0" % locale_now(), flush=True)
     print(f"\nmodel: {model}   sessions: {n}   intents/session: {len(oracle)}")
     print(f"{'cond':6s} {'arm':9s} {'ok':>8s} {'wasted':>7s} {'silent':>7s} {'calls':>6s}")
     for cond, res in results.items():
         for a, e in res.items():
             print(f"{cond:6s} {a:9s} {e['ok']:>3d}/{e['total']:<4d} {e['wasted']:>7d} {e['silent']:>7d} {e['model_calls']:>6d}")
+    invalid = al.SEMANTIC_ERRORS["n"] > 0
+    if invalid:
+        print("\nINVALID RUN: %d model call(s) failed (%s). The model arms ran without their model on those steps; do not quote them. "
+              "Re-run after fixing the cause (a cache is not used here, so a re-run repeats the calls)." % (al.SEMANTIC_ERRORS["n"], al.SEMANTIC_ERRORS["last"]))
     if "--out" in argv:
         out = argv[argv.index("--out") + 1]
         os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)
         with open(out + ".json", "w", encoding="utf-8") as fh:
-            json.dump({"model": model, "sessions": n, "oracle": oracle, "results": results}, fh, indent=2)
+            json.dump({"model": model, "sessions": n, "oracle": oracle, "valid": not invalid, "model_errors": dict(al.SEMANTIC_ERRORS), "results": results}, fh, indent=2)
         print("saved", out + ".json")
     return 0
 

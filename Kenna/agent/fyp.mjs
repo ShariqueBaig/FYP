@@ -79,7 +79,7 @@ if (!cmd || args.help) {
     'fyp.mjs run [--arm healed|baseline] [--breaks B1,B4] [--caption "text"] [--shot out.png]',
     'fyp.mjs intent <intent.id> [--caption "text"]',
     'fyp.mjs survey',
-    'fyp.mjs experiment [--n 3] [--set demo|full|semantic] [--arms baseline,healed,llm-only,hybrid] [--semantic offline|anthropic] [--out dir]',
+    'fyp.mjs experiment [--n 3] [--set demo|full|semantic|inject|vision] [--arms baseline,healed,llm-only,model-verified,hybrid] [--semantic offline|anthropic] [--out dir]',
     'fyp.mjs say "post a photo with caption hello" [--speak]   plain English in; one JSON out (+ a sentence to read aloud)',
     'fyp.mjs teach --name like.first --say "like the first post" --headed   do a task ONCE by hand; Enter to finish; it learns the steps + a check for each',
     'fyp.mjs routines                   what has been taught',
@@ -90,7 +90,7 @@ if (!cmd || args.help) {
     'fyp.mjs protect --url <site> --setting "<label>" [--n 10] [--gap 3] [--out dir]   how does the site\'s protection treat this agent? (measures, never evades)',
     'fyp.mjs login                      sign in to the live app with the vault login',
     'fyp.mjs vault status|set|clear     where the live login is kept (never printed)',
-    'model:  [--semantic offline|anthropic] [--semantic-model id] [--semantic-cache file] [--semantic-shot]   a model the harness asks only when every rule fails (anthropic needs ANTHROPIC_API_KEY in the env)',
+    'model:  [--semantic offline|anthropic] (key: env ANTHROPIC_API_KEY, else ANTHROPIC_API_KEY_FILE, else agent/anthropic.key) [--semantic-model id] [--semantic-cache file] [--semantic-shot (screenshot with numbered badges; needs a vision model)]   a model the harness asks only when every rule fails (anthropic needs ANTHROPIC_API_KEY in the env)',
     'common: [--viewport 410x779] [--headed] [--url http://host:port]',
     'live:   [--live] [--login]   --live opens the app WITHOUT demo mode; --login signs in from the vault',
     'gated site: set FYP_CF_ACCESS_ID + FYP_CF_ACCESS_SECRET (Cloudflare Access service token)',
@@ -182,12 +182,17 @@ const sem = bridgeFromFlags({
   semantic: typeof args.semantic === 'string' ? args.semantic : null,
   model: typeof args['semantic-model'] === 'string' ? args['semantic-model'] : null,
   cache: typeof args['semantic-cache'] === 'string' ? args['semantic-cache'] : null,
+  logFile: typeof args['semantic-log'] === 'string' ? args['semantic-log'] : null,
   screenshot: args['semantic-shot'] ? async () => (await page.screenshot({ type: 'png' })).toString('base64') : null,
   log,
 });
 if (!sem.ok) { await browser.close().catch(() => {}); if (served) served.server.close(); emit(sem, 2); }
 if (sem.secret) secrets.add(sem.secret);
 if (sem.bridge) await page.exposeFunction('__fypSemantic', sem.bridge);
+// A model arm that hit provider errors (rate limit, bad key, outage) quietly lost its model: say so, loudly.
+const validity = () => (sem.bridge && sem.bridge.stats.errors > 0
+  ? { valid: false, invalidReason: sem.bridge.stats.errors + ' model call(s) failed (' + sem.bridge.stats.lastError + '): the model arms ran without their model on those steps. Re-run the same command; the disk cache keeps every answer already paid for, so only the gaps are retried.' }
+  : { valid: true });
 const semanticStats = async () => (sem.bridge ? { ...(await page.evaluate(() => window.__FYP_AGENT.semantic.stats())), bridge: sem.bridge.stats } : null);
 
 // A rate limit shows up as refused sub-requests (HTTP 429), not as a broken page.
@@ -247,7 +252,7 @@ try {
   const ready = await page.evaluate(() => (window.__FYP_AGENT ? window.__FYP_AGENT.ready(30000) : false));
   if (!ready) await finish(notReady(live ? 'Signed in, but the feed did not finish loading.' : 'The app or harness did not finish loading. Check that demo/ is a current build.'), throttled ? 1 : 2);
 
-  if (sem.bridge) await call('semantic.configure', { enabled: true });
+  if (sem.bridge) await call('semantic.configure', { enabled: true, marks: !!(args['semantic-shot'] || args['semantic-marks']) });
   if (cmd === 'describe') await finish(await call('describe'), 0);
   if (cmd === 'status') await finish(await call('status'), 0);
 
@@ -261,7 +266,7 @@ try {
     if (opts.arm === 'llm-only' && !sem.bridge) await finish({ ok: false, error: 'usage', userMessage: '--arm llm-only needs a model: add --semantic offline or --semantic anthropic.' }, 2);
     log('run', JSON.stringify(opts));
     const res = await call('runFlow', opts);
-    if (sem.bridge) res.semantic = await semanticStats();
+    if (sem.bridge) { res.semantic = await semanticStats(); Object.assign(res, validity()); }
     if (typeof args.shot === 'string') {
       await page.screenshot({ path: args.shot });
       res.screenshotFile = path.resolve(args.shot);
@@ -281,9 +286,11 @@ try {
     const n = Number(args.n) || 3;
     log('experiment n=' + n + ' set=' + (args.set || 'demo') + ' (takes a while)');
     const arms = typeof args.arms === 'string' ? args.arms.split(',').map((x) => x.trim()).filter(Boolean) : undefined;
-    if (arms && arms.some((a) => ['llm-only', 'hybrid'].includes(a)) && !sem.bridge) await finish({ ok: false, error: 'usage', userMessage: 'Arms llm-only and hybrid need a model: add --semantic offline or --semantic anthropic.' }, 2);
+    if (arms && arms.some((a) => ['llm-only', 'hybrid', 'model-verified'].includes(a)) && !sem.bridge) await finish({ ok: false, error: 'usage', userMessage: 'Arms llm-only, model-verified and hybrid need a model: add --semantic offline or --semantic anthropic.' }, 2);
     const res = await call('experiment', n, typeof args.set === 'string' ? args.set : 'demo', arms);
     res.semanticBridge = sem.bridge ? sem.bridge.stats : null;
+    Object.assign(res, validity());
+    if (res.valid === false) log('INVALID RUN: ' + res.invalidReason);
     if (typeof args.out === 'string') {
       fs.mkdirSync(args.out, { recursive: true });
       fs.writeFileSync(path.join(args.out, 'results.json'), JSON.stringify(res, null, 2));
@@ -293,7 +300,21 @@ try {
       }
       res.savedTo = path.resolve(args.out);
     }
-    await finish({ ok: true, summary: res.summary, semantic: res.semantic || null, semanticBridge: res.semanticBridge, savedTo: res.savedTo || null }, 0);
+    if (typeof args.out === 'string') {
+      fs.writeFileSync(path.join(args.out, 'results.json'), JSON.stringify(res, null, 2));
+      const { buildManifest, aggregate, renderMarkdown, csvOf } = await import('./report.mjs');
+      const v = validity();
+      const manifest = buildManifest({
+        command: 'fyp.mjs ' + process.argv.slice(2).join(' '), set: typeof args.set === 'string' ? args.set : 'demo',
+        arms: arms || ['baseline', 'healed'], n, semantic: res.semantic || null, valid: v.valid, invalidReason: v.invalidReason,
+        extra: { semanticBridge: res.semanticBridge || null, viewport: vw + 'x' + vh },
+      });
+      fs.writeFileSync(path.join(args.out, 'manifest.json'), JSON.stringify(manifest, null, 2));
+      const rows = aggregate(res);
+      fs.writeFileSync(path.join(args.out, 'report.md'), renderMarkdown(rows, manifest, path.basename(path.resolve(args.out))));
+      fs.writeFileSync(path.join(args.out, 'report.csv'), csvOf(rows));
+    }
+    await finish({ ok: true, ...validity(), summary: res.summary, semantic: res.semantic || null, semanticBridge: res.semanticBridge, savedTo: res.savedTo || null }, 0);
   }
 
   // teach: the user does a task ONCE by hand in a real window; the harness turns it
@@ -392,7 +413,7 @@ try {
     // as 1) to the first run in which no action was wasted. null = never, within `runs`.
     const settleOf = (a) => { const hit = after(a).find((x) => x.failedActions === 0); return hit ? hit.run - driftAt : null; };
     const out = {
-      ok: true, driftAt, runs, breaks,
+      ok: true, ...validity(), driftAt, runs, breaks,
       summary: {
         afterDrift: Object.fromEntries(armNames.map((a) => [a, {
           meanFailedActions: mean(after(a).map((x) => x.failedActions)), meanMs: mean(after(a).map((x) => x.ms)),

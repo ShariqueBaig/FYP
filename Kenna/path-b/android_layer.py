@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hierdump as hd  # noqa: E402  (the working offline analyzer: parse, Node, bounds)
 
 MIN_CONF_IRREVERSIBLE = 0.8
+SEMANTIC_ERRORS = {"n": 0, "last": ""}   # model calls that failed: a run with any of these is INVALID for the model arms
 SEMANTIC_TOP = 3
 
 
@@ -239,10 +240,217 @@ SYSTEM = ("You help an assistant operate an app for a person who cannot do the s
           "{\"ranked\":[{\"i\":<index>,\"confidence\":<0..1>}],\"reason\":\"<short>\"}")
 
 
+DEFAULT_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "agent", "anthropic.key")
+
+
+def load_api_key(env=None, read=None):
+    """Same order as agent/semantic.mjs: env ANTHROPIC_API_KEY, then the file named by ANTHROPIC_API_KEY_FILE,
+    then agent/anthropic.key (git-ignored; the human puts the key there, never in chat). Lines starting with
+    # and blank lines are ignored. Returns (key, source) or None. The key is never printed."""
+    env = os.environ if env is None else env
+    read = read or (lambda f: open(f, encoding="utf-8").read())
+
+    def clean(t):
+        for line in str(t or "").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                return line
+        return ""
+    k = clean(env.get("ANTHROPIC_API_KEY"))
+    if k:
+        return k, "env ANTHROPIC_API_KEY"
+    for f, label in ((env.get("ANTHROPIC_API_KEY_FILE"), "ANTHROPIC_API_KEY_FILE"), (DEFAULT_KEY_FILE, "agent/anthropic.key")):
+        if not f:
+            continue
+        try:
+            k = clean(read(f))
+        except OSError:
+            continue
+        if k:
+            return k, label
+    return None
+
+
+def last_ranked_json(text):
+    """The LAST JSON object containing a "ranked" list (a reasoning model may think out loud first)."""
+    s = str(text or "")
+    best = None
+    i = s.find("{")
+    while i >= 0:
+        depth, j = 0, i
+        while j < len(s):
+            if s[j] == "{":
+                depth += 1
+            elif s[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        o = json.loads(s[i:j + 1])
+                        if isinstance(o, dict) and isinstance(o.get("ranked"), list):
+                            best = o
+                    except ValueError:
+                        pass
+                    break
+            j += 1
+        i = s.find("{", i + 1)
+    return best
+
+
+DEFAULT_OPENROUTER_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "agent", "openrouter.key")
+
+
+def load_openrouter_key(env=None, read=None):
+    """env OPENROUTER_API_KEY, then the file named by OPENROUTER_API_KEY_FILE, then agent/openrouter.key."""
+    env = os.environ if env is None else env
+    read = read or (lambda f: open(f, encoding="utf-8").read())
+
+    def clean(t):
+        for line in str(t or "").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                return line
+        return ""
+    k = clean(env.get("OPENROUTER_API_KEY"))
+    if k:
+        return k, "env OPENROUTER_API_KEY"
+    for f, label in ((env.get("OPENROUTER_API_KEY_FILE"), "OPENROUTER_API_KEY_FILE"), (DEFAULT_OPENROUTER_KEY_FILE, "agent/openrouter.key")):
+        if not f:
+            continue
+        try:
+            k = clean(read(f))
+        except OSError:
+            continue
+        if k:
+            return k, label
+    return None
+
+
+def openrouter_semantic(model=None, sleep=None):
+    """OpenRouter (OpenAI chat-completions format). Retries 429/5xx with back-off; free models are rate-limited."""
+    import time
+    import urllib.error
+    sleep = sleep or time.sleep
+    found = load_openrouter_key()
+    if not found:
+        raise RuntimeError("no OpenRouter key: put it in agent/openrouter.key yourself (never in chat) or set OPENROUTER_API_KEY")
+    key = found[0]
+    model = model or os.environ.get("FYP_SEMANTIC_MODEL", "qwen/qwen3.7-flash")
+    gap = float(os.environ.get("FYP_SEMANTIC_MIN_GAP_MS", "3200")) / 1000.0
+    last = {"t": 0.0, "dead": ""}
+
+    def ask(payload):
+        if last["dead"]:
+            raise RuntimeError(last["dead"])
+        # Free tiers allow a few requests a minute: space live calls out instead of failing on the limit.
+        wait = last["t"] + gap - time.time()
+        if wait > 0:
+            sleep(wait)
+        last["t"] = time.time()
+        reasoning = os.environ.get("FYP_SEMANTIC_REASONING", "")
+        extra = {"reasoning": {"enabled": False}} if reasoning == "off" else ({"reasoning": {"effort": reasoning}} if reasoning else {})
+        body = json.dumps({"model": model, "max_tokens": 2000, "temperature": 0, "seed": 0, **extra,
+                           "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": json.dumps(payload)}]}).encode()
+        err = ""
+        ra = 0.0
+        for attempt in range(7):
+            req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=body, method="POST",
+                                         headers={"content-type": "application/json", "authorization": "Bearer " + key,
+                                                  "x-title": "Kenna FYP harness"})
+            try:
+                with urllib.request.urlopen(req, timeout=90) as r:
+                    res = json.load(r)
+                if not res.get("error"):
+                    msg = ((res.get("choices") or [{}])[0].get("message")) or {}
+                    parsed = last_ranked_json(msg.get("content")) or last_ranked_json(msg.get("reasoning")) or {"ranked": []}
+                    ranked = []
+                    for x in parsed["ranked"]:
+                        if isinstance(x, dict) and isinstance(x.get("i"), int):
+                            try:
+                                c = max(0.0, min(1.0, float(x.get("confidence", 0.5))))
+                            except (TypeError, ValueError):
+                                c = 0.5
+                            ranked.append({"i": x["i"], "confidence": c})
+                    u = res.get("usage") or {}
+                    return {"ranked": ranked, "provider": "openrouter:" + model,
+                            "usage": {"inputTokens": u.get("prompt_tokens", 0), "outputTokens": u.get("completion_tokens", 0),
+                                      "costUsd": float(u.get("cost") or 0),
+                                      "reasoningTokens": (u.get("completion_tokens_details") or {}).get("reasoning_tokens", 0)}}
+                err = "model API " + str((res["error"] or {}).get("code", ""))
+            except urllib.error.HTTPError as e:
+                err = "model API %d" % e.code
+                if e.code in (429, 402):
+                    try:
+                        msg = str(((json.loads(e.read().decode("utf-8", "replace")) or {}).get("error") or {}).get("message") or "")
+                    except (ValueError, OSError):
+                        msg = ""
+                    # A DAILY cap or an empty balance does not clear by waiting: stop, and stay stopped.
+                    if e.code == 402 or any(w in msg.lower() for w in ("per-day", "per day", "daily", "credit", "balance", "quota")):
+                        last["dead"] = "model API %d (daily limit or no credit): %s" % (e.code, msg[:110])
+                        raise RuntimeError(last["dead"])
+                if e.code not in (429, 500, 502, 503, 504):
+                    break
+                try:
+                    ra = float(e.headers.get("retry-after") or 0)
+                except (TypeError, ValueError):
+                    ra = 0.0
+            except (urllib.error.URLError, TimeoutError) as e:
+                err = "network: %s" % e
+            sleep(min(90, max(ra, 4 * 2 ** attempt)))
+        raise RuntimeError(err or "model API failed")
+    return ask
+
+
+def _logged(fn, label):
+    """Append one JSON line per model decision to $FYP_SEMANTIC_LOG (what was asked, what was picked, tokens, latency)."""
+    path = os.environ.get("FYP_SEMANTIC_LOG")
+    if not path:
+        return fn
+    import time as _t
+
+    def wrapped(payload):
+        t0 = _t.time()
+        err = None
+        res = None
+        try:
+            res = fn(payload)
+            return res
+        except Exception as e:                                # noqa: BLE001
+            err = str(e)[:160]
+            raise
+        finally:
+            by = {c["i"]: c for c in payload.get("controls", [])}
+            line = {"t": _t.strftime("%Y-%m-%dT%H:%M:%S"), "cached": False, "ms": int((_t.time() - t0) * 1000), "error": err, "model": label,
+                    "task": "control", "intent": {k: payload["intent"].get(k) for k in ("id", "desc", "action")},
+                    "nOptions": len(payload.get("controls", [])),
+                    "picks": [{"i": r["i"], "confidence": r.get("confidence"), "label": by.get(r["i"], {}).get("label", ""),
+                               "text": by.get(r["i"], {}).get("text", "")} for r in (res or {}).get("ranked", [])],
+                    "usage": (res or {}).get("usage")}
+            try:
+                with open(path, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(line) + chr(10))
+            except OSError:
+                pass
+    return wrapped
+
+
+def make_semantic(kind, model=None):
+    """offline | anthropic | openrouter -> (callable, label for reports). Never prints a key."""
+    if kind == "offline":
+        return offline_semantic, "offline-lexical STUB"
+    if kind == "anthropic":
+        return anthropic_semantic(model), "anthropic:" + (model or os.environ.get("FYP_SEMANTIC_MODEL", "claude-haiku-5-5"))
+    if kind == "openrouter":
+        label = "openrouter:" + (model or os.environ.get("FYP_SEMANTIC_MODEL", "qwen/qwen3.7-flash"))
+        return _logged(openrouter_semantic(model), label), label
+    raise ValueError("--semantic takes offline, anthropic or openrouter")
+
+
 def anthropic_semantic(model=None):
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set (set it in your own terminal; never paste it into chat)")
+    found = load_api_key()
+    if not found:
+        raise RuntimeError("no model key: put it in agent/anthropic.key yourself (never in chat) or set ANTHROPIC_API_KEY. "
+                           "An AI agent with its own key in its backend should set ANTHROPIC_API_KEY and not ask the user.")
+    key = found[0]
     model = model or os.environ.get("FYP_SEMANTIC_MODEL", "claude-haiku-5-5")
 
     def ask(payload):
@@ -287,7 +495,9 @@ class Layer:
             self.semantic_calls += 1
             try:
                 res = self.semantic(build_payload(it, cs, nodes))
-            except Exception:
+            except Exception as e:                            # noqa: BLE001
+                SEMANTIC_ERRORS["n"] += 1
+                SEMANTIC_ERRORS["last"] = str(e)[:160]
                 return []
             ranked = [r for r in res.get("ranked", []) if isinstance(r.get("i"), int) and 0 <= r["i"] < len(cs)]
             if it.irreversible:
@@ -349,7 +559,9 @@ class Layer:
         self.semantic_calls += 1
         try:
             res = self.semantic(build_payload(it, cs, nodes)) if self.semantic else {"ranked": []}
-        except Exception:                                     # noqa: BLE001
+        except Exception as e:                                # noqa: BLE001
+            SEMANTIC_ERRORS["n"] += 1
+            SEMANTIC_ERRORS["last"] = str(e)[:160]
             res = {"ranked": []}
         ranked = [r for r in res.get("ranked", []) if isinstance(r.get("i"), int) and 0 <= r["i"] < len(cs)]
         if not ranked:
@@ -561,6 +773,24 @@ def selftest():
     r = ly2.run_intent(it)
     check("irreversible intent: a 0.5-confidence guess is never acted on", "semantic[0]" not in r.detail and "close" not in ly2.driver.app.taps, r.detail)
 
+    print("model key lookup")
+    check("env var wins", load_api_key({"ANTHROPIC_API_KEY": " sk-ant-env "}, lambda f: "sk-ant-file")[0] == "sk-ant-env")
+    check("file used when no env, comments ignored", load_api_key({}, lambda f: "# note\n\nsk-ant-file\n") == ("sk-ant-file", "agent/anthropic.key"))
+    check("only comments -> no key", load_api_key({}, lambda f: "# paste below\n") is None)
+    check("missing file -> None, not a crash", load_api_key({}, lambda f: (_ for _ in ()).throw(FileNotFoundError())) is None)
+
+    print("openrouter helpers")
+    check("last_ranked_json takes the last object with a ranked list", last_ranked_json('think {"a":1} then {"ranked":[{"i":3,"confidence":0.9}]}')["ranked"][0]["i"] == 3)
+    check("last_ranked_json: no JSON -> None", last_ranked_json("nope") is None)
+    check("openrouter key: env wins", load_openrouter_key({"OPENROUTER_API_KEY": " sk-or-env "}, lambda f: "x")[0] == "sk-or-env")
+    check("openrouter key: file used when no env", load_openrouter_key({}, lambda f: "# c" + chr(10) + "sk-or-file")[1] == "agent/openrouter.key")
+    try:
+        make_semantic("gpt")
+        rejected = False
+    except ValueError:
+        rejected = True
+    check("make_semantic rejects an unknown provider", rejected)
+
     print("hierdump interop")
     nodes = hd.parse(FakeApp(()).dump_xml())
     check("tree parses and exposes clickable controls", len(controls(nodes)) == 5, len(controls(nodes)))
@@ -580,7 +810,7 @@ def main(argv):
         sem = None
         if "--semantic" in argv:
             kind = argv[argv.index("--semantic") + 1]
-            sem = offline_semantic if kind == "offline" else anthropic_semantic()
+            sem, _ = make_semantic(kind, argv[argv.index("--semantic-model") + 1] if "--semantic-model" in argv else None)
         cs = controls(nodes)
         ly = Layer(None, sem)
         out = []

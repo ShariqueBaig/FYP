@@ -1,0 +1,82 @@
+{
+  "model": "offline-lexical STUB (English only)",
+  "sessions": 2,
+  "oracle": {
+    "network": "NetworkDashboardFragment",
+    "devices": "ConnectedDeviceDashboardFragment",
+    "apps": "AppDashboardFragment",
+    "notifications": "ConfigureNotificationSettings",
+    "sound": "SoundSettings"
+  },
+  "results": {
+    "en": {
+      "rules": {
+        "ok": 10,
+        "total": 10,
+        "wasted": 0,
+        "silent": 0,
+        "model_calls": 0
+      },
+      "hybrid": {
+        "ok": 10,
+        "total": 10,
+        "wasted": 0,
+        "silent": 0,
+        "model_calls": 0
+      },
+      "llm-only": {
+        "ok": 6,
+        "total": 10,
+        "wasted": 4,
+        "silent": 4,
+        "model_calls": 10
+      }
+    },
+    "fr": {
+      "rules": {
+        "ok": 2,
+        "total": 10,
+        "wasted": 0,
+        "silent": 0,
+        "model_calls": 0
+      },
+      "hybrid": {
+        "ok": 6,
+        "total": 10,
+        "wasted": 0,
+        "silent": 0,
+        "model_calls": 8
+      },
+      "llm-only": {
+        "ok": 6,
+        "total": 10,
+        "wasted": 0,
+        "silent": 0,
+        "model_calls": 10
+      }
+    },
+    "font": {
+      "rules": {
+        "ok": 8,
+        "total": 10,
+        "wasted": 0,
+        "silent": 0,
+        "model_calls": 0
+      },
+      "hybrid": {
+        "ok": 8,
+        "total": 10,
+        "wasted": 4,
+        "silent": 0,
+        "model_calls": 2
+      },
+      "llm-only": {
+        "ok": 4,
+        "total": 10,
+        "wasted": 6,
+        "silent": 6,
+        "model_calls": 10
+      }
+    }
+  }
+}

@@ -32,7 +32,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "pattern": "^B([1-9]|10)$"
+              "pattern": "^B([1-9]|1[01])$"
             },
             "description": "UI breaks to inject first (testing only). Never set for a real user task."
           },

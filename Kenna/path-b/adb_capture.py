@@ -49,9 +49,10 @@ def find_adb(env=None, which=shutil.which, exists=os.path.exists) -> Optional[st
     found = which("adb")
     if found:
         return found
-    roots = [env.get("ANDROID_SDK_ROOT"), env.get("ANDROID_HOME"),
+    # This project's SDK first: two different adb versions on one machine kill each other's background
+    # server (every call restarts it and can hang), so always use the same one the emulator was set up with.
+    roots = ["D:/AndroidSdk", env.get("ANDROID_SDK_ROOT"), env.get("ANDROID_HOME"),
              os.path.join(env.get("LOCALAPPDATA", ""), "Android", "Sdk") if env.get("LOCALAPPDATA") else None,
-             "D:/AndroidSdk",   # this project's SDK, kept off C: and outside OneDrive
              os.path.expanduser("~/Library/Android/sdk"), os.path.expanduser("~/Android/Sdk")]
     for r in filter(None, roots):
         for exe in ("adb.exe", "adb"):

@@ -13,3 +13,6 @@ site/
 # credential vault + local secrets: never commit
 agent/.vault/
 agent/.env.local
+agent/anthropic.key
+agent/*.key
+path-b/results/*.key

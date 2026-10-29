@@ -1,0 +1,40 @@
+screen                        ctrl   rid  desc  text  anon  rid1  ridX  desc1  descX
+--------------------------------------------------------------------------------------------
+apps_s1.xml                     12     0     0     0    12     0     0      0      0
+apps_s2.xml                     12     0     0     0    12     0     0      0      0
+apps_s3.xml                     12     0     0     0    12     0     0      0      0
+display_s1.xml                   9     1     2     0     7     1     2      2      0
+display_s2.xml                   9     1     2     0     7     1     2      2      0
+display_s3.xml                   9     1     2     0     7     1     2      2      0
+home_s1.xml                     10     2     1     0     8     2     5      1      0
+home_s2.xml                     10     2     1     0     8     2     5      1      0
+home_s3.xml                     10     2     1     0     8     2     5      1      0
+sound_s1.xml                     4     0     1     0     3     0     5      1      3
+sound_s2.xml                     4     0     1     0     3     0     5      1      3
+sound_s3.xml                     4     0     1     0     3     0     5      1      3
+wifi_s1.xml                     11     2     4     0     6     2     5      3      1
+wifi_s2.xml                     11     2     4     0     6     2     5      3      1
+wifi_s3.xml                     11     2     4     0     6     2     5      3      1
+--------------------------------------------------------------------------------------------
+TOTAL                          138    15    24     0   108    15    51     21     12
+
+  a tree hook that is unique 1-of-1:  rid 11%   desc 15%
+  either rid or desc present:         11% / 17%  (overlap not de-duplicated)
+  no own rid/desc/text:               78%   of which named by a child label 76%
+  NAMELESS (screenshot-fallback zone): 2%   <- nothing for a screen reader or a text locator
+
+  Read it like this:
+   * NAMELESS% is the size of the screenshot-fallback surface - the number your
+     hybrid design has to live with. Judge it on the accessible NAME (own text/desc,
+     else child labels), not on the control's own attributes: on stock Settings the
+     own-attribute view said 59% anonymous and the name-aware view said 0%.
+   * ridX/descX are collisions: a hook exists but is shared, so it needs a
+     scoped chain. High collisions mean 'ladder + scoping', not 'no hooks'.
+   * rid is version-pinned. Re-run this per app build to get half-life.
+
+control identity across sessions (same rid+desc+name in every session):
+  apps     stable 12/12  (100%)
+  display  stable 9/9  (100%)
+  home     stable 10/10  (100%)
+  sound    stable 4/4  (100%)
+  wifi     stable 10/13  (76%)

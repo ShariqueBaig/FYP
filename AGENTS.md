@@ -42,6 +42,9 @@ Firebase and no `node_modules` for the app.
 | `protect --url <site> --setting "<label>" --n 10 --out results/protection` | how a site's protection layer treats this agent; measures and reports only, never evades |
 | `... --semantic offline\|anthropic` | the **semantic rung**: a model is asked only when every rule route fails. `anthropic` needs `ANTHROPIC_API_KEY` in the environment (never a file, never chat). `offline` is a no-cost lexical stand-in for plumbing tests, **not** a measure of a model. Also `--semantic-model`, `--semantic-cache f.json`, `--semantic-shot` |
 | `experiment --set semantic --arms baseline,healed,llm-only,hybrid` | drift the rules cannot read (B9 reword, B10 relocate); adds wrong-action and silent-wrong-action columns |
+| `experiment --arms baseline,healed,llm-only,model-verified,hybrid`, `--set semantic\|inject\|vision` | arms and drift sets; `inject` plants instructions in labels (B11); `vision` removes all words (with `--semantic-shot`, screenshot + numbered badges) |
+| `--semantic openrouter [--semantic-model id]` | OpenAI-format models via OpenRouter (key: `OPENROUTER_API_KEY` or `agent/openrouter.key`). **A run with `valid:false` had model calls fail: never quote it** |
+| `node agent/report.mjs <dir> [--publish name]` / `bash agent/run_protocol.sh` | CI tables + manifest from raw logs; resumable real-model protocol |
 | `login` / `run --login` | live app only: sign in with the vault login, then (for `run`) do the flow. Use `--live --url <site>` |
 | `vault status\|set\|clear` | where the live login is kept. `set` is typed by the human, never by an agent. Status never prints the password |
 
@@ -59,6 +62,16 @@ Common flags: `--viewport 410x779` (default), `--headed`, `--url <already-served
 | `Kenna/path-b/` | Android accessibility-tree layer (Phase 2). `hierdump.py` (offline analyzer) and **`android_layer.py`** (intent/route ladder + model rung, `python android_layer.py selftest`) and **`adb_capture.py`** (adb capture + parser, `selftest`) work against saved/canned/synthetic dumps; `AdbDriver` and `adb_capture.py` have run live on the `kenna` emulator (SDK at `D:\AndroidSdk`) against stock Settings only; no Android arms comparison or real-model result exists. `live_dumper.py` now parses but needs Appium; `intent_route_layer.py` is the old scaffold | Phase 2 |
 | `Kenna/PATH_B_GUIDE.md`, `kenna_android_automation_fyp_briefing_v2-1.md` | Android build procedure / original problem statement | reference |
 | `Kenna/locator-inspector-plugin-v1.0.2/` | related QA tool; **not** this FYP's contribution | no |
+
+## If you are an AI agent with your own Anthropic key (e.g. Synthie)
+
+(Same for OpenRouter: set `OPENROUTER_API_KEY` and use `--semantic openrouter`; free-model accounts are capped at 50 requests/day.)
+You have the key in your backend, so **run the real-model tests yourself; do not ask the user for a key and do not use `agent/anthropic.key`.**
+Set `ANTHROPIC_API_KEY` in the environment of the process that runs the commands (never write it to a file, never print it), then follow
+`Kenna/NEXT_STEPS.md` section 1 with `--semantic anthropic --semantic-cache <file>`: the web `experiment --set semantic --arms ...`, `learn --semantic`,
+`suggest <routine>`, and on Android `path-b/live_suite.py`, `path-b/live_drift.py` and `path-b/live_smoke.py` with `--semantic anthropic`
+(needs the emulator, see NEXT_STEPS 3b). Report the model id, N, call and token counts; separate "model was wrong and the check caught it" from
+"model was wrong and nobody noticed" (silent). A human with no agent puts the key in `Kenna/agent/anthropic.key` instead.
 
 ## Rebuilding the demo bundle (only when the app source changed)
 

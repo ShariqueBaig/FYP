@@ -20,10 +20,9 @@ node Kenna/agent/fyp.mjs run --breaks B8          # honest stop at step 1
 ```
 
 ## 1. Redo the web results with a REAL model (highest priority - nothing is claimable until this)
-Set the key in YOUR terminal (never in chat, a file or the repo):
-```powershell
-$env:ANTHROPIC_API_KEY = "<your key>"      # PowerShell; session only
-```
+The key is found automatically (see README, "Using a real model"): `ANTHROPIC_API_KEY`, else `ANTHROPIC_API_KEY_FILE`, else `Kenna/agent/anthropic.key`.
+- **Human:** put the key in `Kenna/agent/anthropic.key` (the file already exists, git-ignored, one line). Never in chat.
+- **AI agent with its own key (e.g. Synthie):** set `ANTHROPIC_API_KEY` in your process environment and run all of this yourself; do not ask the user for a key.
 Then (the cache means each distinct prompt is paid for once; re-runs are free):
 ```bash
 node Kenna/agent/fyp.mjs experiment --n 5 --set semantic --arms baseline,healed,llm-only,hybrid \
@@ -34,6 +33,15 @@ node Kenna/agent/fyp.mjs learn --semantic anthropic --semantic-cache Kenna/agent
 Model id: `--semantic-model <id>` or `FYP_SEMANTIC_MODEL` (default `claude-haiku-5-5`). State the id in the report.
 Try `--semantic-shot` (sends a screenshot of the mock app; privacy: only ever on the demo app) and compare.
 Quote N >= 5 and say so; the stub run was n=2.
+
+### 1b. STATUS OF THE REAL-MODEL RUNS (read first)
+The only real model run so far is a handful of calls to OpenRouter's free `nvidia/nemotron-3.5-super-vl:free` (one clearly correct
+decision: "Connectivity ..." -> open network settings). Then OpenRouter answered `Rate limit exceeded: free-models-per-day` (50 requests/day
+for free models; the reset time is in the `X-RateLimit-Reset` header, midnight UTC; adding $10 of credit unlocks 1000/day). The provider now
+fails fast on that and the run reports `valid:false`. **To finish the evidence:** add credit (or wait for the reset and run in 50-call
+chunks), then `bash agent/run_protocol.sh openrouter qwen/qwen3.7-flash`. It is resumable: answers are cached.
+Run it for a second model too (`... openrouter <another-free-or-paid-model>`) so the claim is not model-specific.
+The key sits in `agent/openrouter.key` (git-ignored, OneDrive-synced) and was pasted in chat once: **revoke it on openrouter.ai after the project**.
 
 ## 2. Known weaknesses to fix or report
 - B10's moved control is partly covered by the gallery grid, so `compose.next` goes through the keyboard route and `runsToSettle` stays null. Decide: fix B10 (raise z-index / pointer-events) or report it.
@@ -81,6 +89,8 @@ Stop it with `D:/AndroidSdk/platform-tools/adb.exe emu kill`. Add `-no-window` t
 | file | what |
 |---|---|
 | `fyp-mvp/harness.js` | routes `learned`, `semantic`; `runLlmOnly`; B9, B10; arms in `ARM_RUNNERS`; `wrongOf` metrics |
+| `agent/report.mjs` + `report.test.mjs`, `agent/run_protocol.sh`, `path-b/report_android.py` | manifest + CI tables from raw logs; the resumable real-model protocol |
+| `DEFENSE.md` | claims, evidence status, demo script, questions, limitations |
 | `agent/semantic.mjs` + `semantic.test.mjs` | model bridge: offline stub, anthropic provider, disk cache, flags |
 | `agent/fyp.mjs` | `--semantic`, `--semantic-model`, `--semantic-cache`, `--semantic-shot`, `--arms`, `learn --semantic` |
 | `agent/results/semantic/` | stub results (experiment, learn): plumbing evidence only |

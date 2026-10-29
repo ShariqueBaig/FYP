@@ -40,7 +40,7 @@ def main(argv):
     sem = None
     if "--semantic" in argv:
         kind = argv[argv.index("--semantic") + 1]
-        sem = al.offline_semantic if kind == "offline" else al.anthropic_semantic()
+        sem, _ = al.make_semantic(kind, argv[argv.index("--semantic-model") + 1] if "--semantic-model" in argv else None)
     goal = "Open the network and internet settings"
     run("rules, exact title", al.Intent("settings.network", goal, text="Network & internet", success=airplane))
     run("rules, reworded hint (drift)", al.Intent("settings.network", goal, text="Connectivity", success=airplane))

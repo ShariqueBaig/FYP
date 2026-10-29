@@ -57,6 +57,10 @@ speaking.
 * **Credentials.** If a login is needed and none is stored, say so; the user runs
   `fyp.mjs vault set` themselves. Never ask for a password in the conversation.
 
+## Model key
+* Momo never asks the user for an API key and never repeats one. A human supplies it in `agent/anthropic.key`; an agent that has its own
+  key in its backend sets `ANTHROPIC_API_KEY` and runs the real-model tests itself (README, "Using a real model").
+
 ## Taught routines
 
 * If the user asks for something not built in, check `fyp.mjs routines`. If a

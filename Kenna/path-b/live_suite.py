@@ -150,8 +150,7 @@ def main(argv):
     sem, model = None, "none"
     if "--semantic" in argv:
         kind = argv[argv.index("--semantic") + 1]
-        sem = al.offline_semantic if kind == "offline" else al.anthropic_semantic()
-        model = "offline-lexical STUB" if kind == "offline" else os.environ.get("FYP_SEMANTIC_MODEL", "claude-haiku-5-5")
+        sem, model = al.make_semantic(kind, argv[argv.index("--semantic-model") + 1] if "--semantic-model" in argv else None)
     arms = [a for a in ARMS if sem or a in ("exact", "stale")]
     res = {a: {"ok": 0, "total": 0, "wasted": 0, "model_calls": 0, "silent": 0, "rows": []} for a in arms}
     for session in range(1, n + 1):
@@ -174,11 +173,15 @@ def main(argv):
     for a in arms:
         e = res[a]
         print(f"{a:9s} {e['ok']:>4d}/{e['total']:<4d} {e['wasted']:>12d} {e['silent']:>13d} {e['model_calls']:>12d}")
+    invalid = al.SEMANTIC_ERRORS["n"] > 0
+    if invalid:
+        print("\nINVALID RUN: %d model call(s) failed (%s). The model arms ran without their model on those steps; do not quote them. "
+              "Re-run after fixing the cause (a cache is not used here, so a re-run repeats the calls)." % (al.SEMANTIC_ERRORS["n"], al.SEMANTIC_ERRORS["last"]))
     if "--out" in argv:
         out = argv[argv.index("--out") + 1]
         os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)
         with open(out + ".json", "w", encoding="utf-8") as fh:
-            json.dump({"model": model, "sessions": n, "arms": res, "note": "stale-hint drift is simulated on the intent side; stub model is not a language model"}, fh, indent=2)
+            json.dump({"model": model, "sessions": n, "arms": res, "valid": not invalid, "model_errors": dict(al.SEMANTIC_ERRORS), "note": "stale-hint drift is simulated on the intent side; stub model is not a language model"}, fh, indent=2)
         print("saved", out + ".json")
     return 0
 
