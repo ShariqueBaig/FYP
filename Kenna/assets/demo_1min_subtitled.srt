@@ -1,0 +1,96 @@
+1
+00:00:00,000 --> 00:00:01,660
+Hi, I'm Peter Herzog and I'm
+
+2
+00:00:01,660 --> 00:00:05,260
+the Managing Director of ISACOM. We
+
+3
+00:00:05,260 --> 00:00:07,820
+built this thing called synthies. Now
+
+4
+00:00:07,820 --> 00:00:11,200
+Synthies are an AI agent that
+
+5
+00:00:11,200 --> 00:00:15,400
+is wrapped in security scaffolding, not
+
+6
+00:00:15,400 --> 00:00:17,700
+quite a harness because the idea
+
+7
+00:00:17,700 --> 00:00:19,560
+is not to restrict them. They
+
+8
+00:00:19,560 --> 00:00:21,380
+get full root access to the
+
+9
+00:00:21,380 --> 00:00:23,240
+device that they are on and
+
+10
+00:00:23,240 --> 00:00:24,910
+they have access to the network,
+
+11
+00:00:24,920 --> 00:00:27,000
+to the internet, to everything. Now
+
+12
+00:00:27,000 --> 00:00:28,920
+what's protecting them, again, is not
+
+13
+00:00:28,920 --> 00:00:32,990
+a security harness, but an identity.
+
+14
+00:00:33,640 --> 00:00:33,940
+And
+
+15
+00:00:33,940 --> 00:00:36,360
+the idea of the Synthie that
+
+16
+00:00:36,360 --> 00:00:38,800
+we came through, we grew through
+
+17
+00:00:38,800 --> 00:00:42,830
+understanding of child psychology, abnormal psychology,
+
+18
+00:00:43,340 --> 00:00:46,600
+basically how human beings think, how
+
+19
+00:00:46,600 --> 00:00:48,320
+we work, and
+
+20
+00:00:48,320 --> 00:00:50,300
+the idea being is that we
+
+21
+00:00:50,300 --> 00:00:52,240
+give it an identity, we give
+
+22
+00:00:52,240 --> 00:00:53,780
+it memory, all the things that
+
+23
+00:00:53,780 --> 00:00:55,140
+agents are supposed to have, but
+
+24
+00:00:55,140 --> 00:00:57,250
+we grow it. We
+

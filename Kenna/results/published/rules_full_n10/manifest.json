@@ -1,10 +1,10 @@
 {
-  "date": "2026-10-29T09:33:35.024Z",
+  "date": "2026-10-29T18:10:03.701Z",
   "git": {
-    "commit": "05cdf50154b7551d9f520ad19db0bb441a3b6e78",
+    "commit": "5773e72137cef4210f9aea1fc56de2e9cc372879",
     "dirty": true
   },
-  "harnessSha256": "56efc30ee6e285d6c28704f399b3f73bd01e4ed77865e1f9a27ed2c212f94258",
+  "harnessSha256": "b0296a44341c735d00fa2e1d46621b45a60c0af79d4cc19d12c6fcaf85583c8b",
   "command": "fyp.mjs experiment --n 10 --set full --arms baseline,healed --out agent/results/protocol/rules_full_n10",
   "set": "full",
   "arms": [

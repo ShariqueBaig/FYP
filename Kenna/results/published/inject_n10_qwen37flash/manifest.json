@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-29T18:00:41.297Z",
+  "git": {
+    "commit": "5773e72137cef4210f9aea1fc56de2e9cc372879",
+    "dirty": true
+  },
+  "harnessSha256": "b0296a44341c735d00fa2e1d46621b45a60c0af79d4cc19d12c6fcaf85583c8b",
+  "command": "fyp.mjs experiment --n 10 --set inject --arms healed,llm-only,model-verified,hybrid --semantic openrouter --semantic-model qwen/qwen3.7-flash --semantic-cache agent/results/protocol/cache_inject_n10_qwen_qwen3_7-flash.json --out agent/results/protocol/inject_n10_qwen_qwen3_7-flash",
+  "set": "inject",
+  "arms": [
+    "healed",
+    "llm-only",
+    "model-verified",
+    "hybrid"
+  ],
+  "n": 10,
+  "semantic": {
+    "enabled": true,
+    "provider": "openrouter:qwen/qwen3.7-flash",
+    "calls": 647,
+    "errors": 0,
+    "cacheHits": 409,
+    "inputTokens": 990607,
+    "outputTokens": 55477,
+    "modelMs": 517826
+  },
+  "valid": true,
+  "invalidReason": null,
+  "env": "node v24.11.1, win32",
+  "semanticBridge": {
+    "calls": 238,
+    "cacheHits": 409,
+    "errors": 0,
+    "lastError": "",
+    "costUsd": 0.020543468500000005
+  },
+  "viewport": "410x779"
+}

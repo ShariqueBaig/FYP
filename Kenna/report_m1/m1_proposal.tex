@@ -1,0 +1,208 @@
+% M1 (MVP) proposal report - software track. New document; the older Kenna/report/ is untouched.
+% Structure follows the M1 jury form: feasibility demonstrator, problem validation, complexity,
+% financial/regulatory feasibility, scope fixed in writing, AI tool usage.
+% Every \todo{...} is something only the team can supply or confirm. Nothing marked as measured
+% is typed from memory: numbers are copied from Kenna/results/published/ and Kenna/docs/DEFENSE.md.
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.6cm]{geometry}
+\usepackage{mathpazo}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs,tabularx,array,enumitem,graphicx,xcolor,hyperref,parskip}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue!50!black}
+\setlist{itemsep=2pt,topsep=3pt}
+\newcommand{\todo}[1]{\textcolor{red}{[\textbf{TODO:} #1]}}
+\newcommand{\tool}{the tool}
+\renewcommand{\arraystretch}{1.2}
+
+\begin{document}
+
+% ---------------------------------------------------------------- title page
+\begin{titlepage}
+\centering
+\vspace*{2.5cm}
+{\LARGE\bfseries Intent-aware, self-healing GUI automation\\for accessible AI assistants}\\[0.6cm]
+{\large\scshape Milestone 1 -- MVP proposal report (software track)}\\[0.3cm]
+\rule{\textwidth}{0.6pt}\\[0.5cm]
+\begin{tabularx}{\textwidth}{@{}X X@{}}
+\textit{Authors:} & \hfill\textit{Advisors:}\\
+Sharique Baig \todo{ERP} & \hfill \todo{internal advisor}\\
+Maira Aijaz \todo{ERP} & \hfill \todo{co-advisor(s), if any}\\
+Barkhi Khan \todo{ERP} & \\
+\end{tabularx}
+\vfill
+\todo{submission date}\\[0.3cm]
+Department of Computer Science\\[0.5cm]
+\IfFileExists{../assets/logo-iba.jpg}{\includegraphics[width=0.45\textwidth]{../assets/logo-iba.jpg}}{IBA SMCS}\\[0.3cm]
+School of Mathematics and Computer Science
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ---------------------------------------------------------------- summary
+\section{Summary}
+Some people cannot operate a screen themselves, so an AI assistant does it for them. Apps change constantly (a button is renamed, reworded or moved), and an assistant that was built on fixed selectors then breaks or, worse, taps the wrong control \emph{without saying so}. We build a \textbf{GUI tool} that an assistant calls with a \emph{goal} (``post a photo with caption hello'') instead of a locator. The tool finds the control through a ladder of routes, checks the next screen to confirm that the step really happened, and, when nothing works, stops and tells the user in plain words that they may need to do the step themselves.
+
+\textbf{What this project is, and is not.} The contribution is the tool. The assistants that use it (Kenna, Momo and similar agents) belong to a family we call \emph{synthies}: long-running, permission-scoped agents with an audit trail. The tool is one item in such an assistant's tool list, the one it reaches for when a target has only a screen and no API. The project is an \textbf{accessibility} project. It is not an adversarial one: the ``breaks'' described below are controlled UI changes of the kind every real app ships, used to show that the tool keeps working when the interface drifts, including in a deliberately worst-case combination.
+
+\textbf{Status at M1.} The MVP runs end to end on a mock social-media web app (nine intents) and on stock Android Settings (an emulator), with a real language model as an optional, verified helper. Section~\ref{sec:demo} gives the evidence and its limits.
+
+% ---------------------------------------------------------------- problem
+\section{Problem and validation}\label{sec:problem}
+\subsection{The problem}
+\begin{itemize}
+\item Assistive use of GUIs depends on controls having stable, readable identities. Apps break this on every release: renamed ids, reworded copy, moved controls, icons without labels.
+\item Script-based automation (recorded locators) fails \emph{loudly} when this happens. Model-driven agents fail \emph{quietly}: they act on their first guess, do not check, and report success.
+\item A user who cannot take over a step needs a third behaviour: heal when it is safe to, verify every step, and otherwise say honestly that it could not finish.
+\end{itemize}
+
+\subsection{Alternatives and competitor analysis}
+Table~\ref{tab:alt} places the tool among existing approaches. Rows are described at the level of what the approach is designed for; \todo{verify each row against vendor documentation and cite it before submission}.
+
+\begin{table}[h]\centering\small
+\begin{tabularx}{\textwidth}{@{}l X X@{}}
+\toprule
+Approach & Designed for & Gap this tool addresses\\\midrule
+Selenium / Appium & A developer's test script with hard-coded locators & Breaks on any locator change; ``no exception'' is treated as success; no notion of a user goal\\
+Healenium, Testim & Healing a test script by re-ranking element attributes & Heals the script's locator, not an intent; no check that the right control was acted on; no plain-language stop\\
+MCP browser tools plus an LLM & A model drives the page step by step from an accessibility snapshot & Model call on every step; the model's own claim of success is trusted; page text goes into the model's context\\
+Screen readers, Voice Access, TalkBack & Direct control by the user, on the user's device & The user must still find and operate every control; no goal-level delegation\\
+Screenshot-and-click agents & General computer use & Strong at clicking; no per-step verification contract, no honest-stop contract for an assistive user\\
+\bottomrule
+\end{tabularx}
+\caption{Alternatives. Comparison of mechanism, not a measured benchmark of competitors.}\label{tab:alt}
+\end{table}
+
+\subsection{Stakeholder evidence}
+\todo{The jury form asks for competitor analysis, stakeholder interviews or a user survey. Competitor analysis is above. No interviews or survey have been done yet. Either run a short set (for example 3--5 interviews with screen-reader or switch-access users, or a 10-question survey) before submission, or state plainly that this is planned for M2 and why. Do not describe any user as having tested the tool unless they did.}
+
+% ---------------------------------------------------------------- approach
+\section{Approach}\label{sec:approach}
+\begin{enumerate}
+\item \textbf{Goal, not locator.} The assistant passes a goal (or the user's own words) to the tool. A plain-English front end maps it to one of nine intents and asks, or declines, rather than guessing.
+\item \textbf{A ladder of routes.} The tool tries, in order, id, label, text, scoped container, remembered route, model, and position. A route counts only if it points at exactly one control.
+\item \textbf{Verify on the next screen.} Each step has a success predicate evaluated on the following screen. A tap that changed nothing counts as wrong and the next route is tried. ``No exception'' is never success.
+\item \textbf{The model is a helper, never a boss.} It may only answer with indices into the list of controls actually on screen. Its answer is acted on as a candidate and judged by the same predicate. An irreversible intent (for example publishing) needs confidence $\ge 0.8$ and uses only the first choice.
+\item \textbf{Honest stop.} If no route works, the tool stops and returns a first-person message that ends with ``You may need to do this step yourself.'' The assistant relays it unchanged; it does not retry in a loop or offer a cheerier summary.
+\item \textbf{Memory and teaching.} A model answer that passed verification is remembered. A human can teach a new routine once; the tool learns the steps and a success check for each, and refuses steps it cannot verify. It never records passwords.
+\end{enumerate}
+Architecture: a harness (intents, ladder, drift injection, scoring) served to a browser by a Node runner, a model bridge (offline stand-in, Anthropic, OpenRouter), and an Android layer that applies the same ladder to UiAutomator trees read over \texttt{adb}.
+
+% ---------------------------------------------------------------- demo
+\section{Technical feasibility demonstrator}\label{sec:demo}
+The hardest part of the idea is not clicking; it is \emph{acting correctly when the interface is not what the script expected, and knowing when it did not work}. The demonstrator targets exactly that.
+
+\subsection{What was built}
+\begin{itemize}
+\item Nine intents for a create-post flow on a mock social app, with scoring and a screen-reader narration region.
+\item Eleven controlled UI changes (B1--B11), used only as stress tests: renamed ids, stripped labels, reversed layout, duplicated control, nested scroller, bare icon, overlay, hidden control, reworded copy, relocated control, and text inside labels that tries to instruct the model.
+\item Five arms for comparison: scripted baseline, rules only (healed), model only, model plus check, and hybrid (rules, then model, all verified).
+\item An Android layer with the same ladder, run live on an emulator against stock Settings.
+\item Reporting that produces tables with 95\% Wilson intervals from raw logs.
+\end{itemize}
+
+\subsection{Why the changes are applied}
+The changes are not attacks on any product. They reproduce what ordinary releases do to a UI: A/B tests reword labels, redesigns move controls, framework upgrades regenerate class names, localisation changes every string, and component libraries sometimes drop accessible names. The extreme combinations answer one question for an assistive user: \emph{what happens in the worst case?} The answer we want is ``it still works, or it stops and says so,'' never ``it silently did the wrong thing.'' The planted-instruction change (B11) is a safety test: an assistant for a person who cannot check the screen must not obey text embedded in a page.
+
+\subsection{Evidence so far}
+Numbers below are copied from \texttt{Kenna/results/published/}; \todo{regenerate before submission and re-read each sentence next to its number}. All model results are one model (\texttt{qwen/qwen3.7-flash}) via OpenRouter, on one mock app or stock Android Settings. Repetitions use temperature 0 and a cache, so they measure variation in the app and harness, not sampling variation of the model.
+
+\begin{table}[h]\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{3.5cm}@{}}
+\toprule
+Claim & Result & Source\\\midrule
+C1: a recorded script breaks under UI change; the ladder survives it & N=10 per cell, 12 configurations, no model. Ladder completes 100\% [72--100] on clean, B1--B7 singly and B1+B2+B3+B4. Recorded script 0\% [0--28] on B1, B2, B6, B7 and every combination. Both stop honestly on B8 & {\scriptsize\texttt{rules\_full\_n10}}\\
+C2: a model rung heals what rules cannot read & Rules alone 0\% [0--28] on three drifted configurations. Hybrid 100\% [72--100] on clean, B9, B1+B9 and B1+B10+B9. Both stop on the most extreme configuration & {\scriptsize\texttt{semantic\_n10\_qwen37flash}}\\
+C3: verification prevents silent wrong actions & Bare model 0\% on every configuration, 1.0--4.4 silent wrong actions per run (on the clean app it silently skips one step). Hybrid: 0 silent wrong actions in every configuration & same report\\
+C6: real drift on Android (language, font) & French: rules 2/10 [6--51]\%, hybrid 10/10 [72--100]\%. Large font: all arms 8/10, two rows below the fold, nothing scrolls yet & {\scriptsize\texttt{android\_qual\_qwen37flash}}\\
+C7: how many controls have no name & 2\% nameless across 5 Settings screens $\times$ 3 sessions, once the labels inside a clickable row count (own attributes alone say 78\%) & {\scriptsize\texttt{path-b/dumps/sessions/}}\\
+C4/C5: planted instructions; remembered answers & Built and unit-tested. C4 has one real-model observation (n=1); the N=10 runs are pending & {\scriptsize\texttt{docs/NEXT\_STEPS.md}}\\
+\bottomrule
+\end{tabularx}
+\caption{Evidence at M1. Interval values are the published ones; pending items are labelled pending.}
+\end{table}
+
+\subsection{Honest limits of the MVP}
+One mock web app and stock Android Settings; one real model; hand-written success predicates; no scrolling; no user study with screen-reader users; the Android drift is language and font scale, not an app update. On Android Settings (about nine controls on screen) a bare model matches the hybrid, so verification shows its benefit on the busier web app and with planted instructions, not there.
+
+% ---------------------------------------------------------------- complexity
+\section{Complexity (Seoul Accord D.4.1)}
+\begin{table}[h]\centering\small
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+\toprule
+Attribute & Where it appears\\\midrule
+Depth of analysis (no obvious solution) & Neither fixed locators nor a bare model works: the first breaks, the second makes silent errors. The ladder-plus-verification design came out of measuring both\\
+Depth of knowledge & Accessibility trees on web and Android, UiAutomator parsing, model prompting with a restricted answer space, statistical reporting\\
+Infrequently encountered issues & Windows suppressed from the accessibility tree, overlays, controls nested in clickable rows, actions that change nothing\\
+Outside standard practice & Success is a predicate on the next screen rather than ``no exception''; a model is admitted only as a verified candidate\\
+Diverse stakeholders & Assistive-technology users, the assistants that call the tool, app developers whose UIs change \todo{confirm and add evidence}\\
+Significant consequences & A wrong action on someone's behalf (for example publishing) is hard to undo; this is why irreversible intents are gated\\
+Interdependent sub-problems & Intent parsing, route ladder, model bridge, verification, memory, Android layer, reporting\\
+Ill-defined requirement & ``Works when the UI changes'' had to be turned into measurable configurations and metrics\\
+\bottomrule
+\end{tabularx}
+\caption{Self-assessment against the eight attributes. The jury scores; this table says where we believe each applies.}
+\end{table}
+
+% ---------------------------------------------------------------- feasibility
+\section{Financial and regulatory feasibility}
+\subsection{Cost}
+The tool needs Node 18 or later, no GPU and no model key for the offline mode. The real-model qualification cost about \$0.02 on OpenRouter (\texttt{qwen/qwen3.7-flash}, roughly \$0.03 and \$0.13 per million input and output tokens); free-tier accounts are capped at 50 requests per day, so the full protocol uses a small paid balance. \todo{add a projected cost for M2--M4 runs and hosting}
+
+\subsection{Legal and regulatory constraints, and how we stay inside them}
+\begin{itemize}
+\item \textbf{Where it is tested.} Only on software we own or are free to test: our own mock web app and stock Android Settings on a local emulator. We do not automate third-party commercial sites, because their terms of service commonly forbid automated access.
+\item \textbf{Bot protection.} We do not evade it. A measure-only probe records how a site's protection layer treats the tool and reports the result. It never bypasses, and nothing in the milestones depends on it. Sites that block automation are outside the scope, and we say so.
+\item \textbf{Real apps later.} Any move to a real third-party app (M4 real-conditions validation) will be read-only or supervised, on the user's own device and account, at human speed, after reading that app's terms, and ideally with the owner's permission. The target will be chosen with the advisor. \todo{decide the M4 target; self-hosted marketplace or open-source apps are the low-risk options}
+\item \textbf{Credentials and data.} No credentials in the repository or in output; a live login lives only in an encrypted local vault set by the human. No user data is collected at M1. \todo{if interviews or a survey are run, state consent and anonymisation}
+\item \textbf{Safety of delegated actions.} Irreversible actions need confirmation and a confidence threshold; planted instructions in page text are treated as untrusted content.
+\end{itemize}
+
+% ---------------------------------------------------------------- scope
+\section{Scope fixed in writing}\label{sec:scope}
+\subsection{In scope}
+\begin{itemize}
+\item The GUI tool: intents, route ladder, step verification, honest-stop messages, model rung, route memory, teaching.
+\item Evaluation on the mock web app (B1--B11 and combinations) and stock Android Settings, with one real model at M1.
+\item Reproducible reports (manifest, tables, raw logs) for every claim.
+\end{itemize}
+\subsection{Out of scope}
+\begin{itemize}
+\item Evading bot detection or fingerprinting; automating third-party sites without permission.
+\item Building the assistants themselves (the tool is called by them).
+\item Training or fine-tuning a model.
+\end{itemize}
+\subsection{Deliverables per milestone}
+\begin{table}[h]\centering\small
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+\toprule
+Milestone & Deliverable \todo{agree with advisor}\\\midrule
+M1 -- MVP & Working demonstrator as above; this report\\
+M2 -- Internal evaluation & End-to-end system against this scope; second model; planted-instruction and vision runs at full N; live walk-through\\
+M3 -- External open house & Same build shown to an external audience \todo{demo target}\\
+M4 -- Real-conditions validation & A real, permitted target used by at least one person outside the group; accessibility and edge-case review\\
+M5 -- Final defence and report & Final report with limitations and AI-use disclosure\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ---------------------------------------------------------------- AI use
+\section{AI tools used}
+\todo{Required by the booklet: which tools, for what tasks, and roughly how much of the code and text they produced. Fill honestly; the viva checks that each member can explain and modify the components.}
+\begin{table}[h]\centering\small
+\begin{tabularx}{\textwidth}{@{}l X l@{}}
+\toprule
+Tool & Used for & Approx.\ share\\\midrule
+\todo{tool} & \todo{code generation / debugging / documentation} & \todo{\%}\\
+\todo{tool} & \todo{test and report generation} & \todo{\%}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+At runtime the system also calls a language model as a verified candidate generator (Section~\ref{sec:approach}); that is a product component, not development assistance. Analysis and conclusions in this report are the authors' own; \todo{confirm}.
+
+% ---------------------------------------------------------------- team
+\section{Team contributions and advisor endorsement}
+\todo{Who built what (intents and harness, model bridge, Android layer, evaluation and reporting).}\\
+\todo{Advisor endorsement date; the form asks whether it was obtained at least 24 hours before submission.}
+
+\end{document}

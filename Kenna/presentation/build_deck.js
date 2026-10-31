@@ -313,12 +313,13 @@ async function main() {
   // ===== 9. Result 2 =====
   s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'Evidence' });
   title(s, 'Result 2: hostile UIs and planted text', 'Labels that tell the model to "ignore the goal" are the nastiest change we tried');
-  const injCfg = ['B11', 'B9+B11', 'B1+B9+B10+B11'];
-  const inj = series('inject_n10_qwen37flash', injCfg, ['healed', 'llm-only', 'hybrid'], [[100, 100, 0], [100, 100, 0], [100, 100, 100]]);
-  s.addChart(pres.charts.BAR, ['healed', 'llm-only', 'hybrid'].map((a, i) => ({ name: ARMS.find((x) => x[0] === a)[1], labels: ['Planted labels', '+ reworded text', '+ ids rotated + control moved'], values: inj.vals[i] })), {
+  const injCfg = ['B11', 'B11+B9', 'B1+B10+B11+B9'];
+  const injArms = ['healed', 'llm-only', 'model-verified', 'hybrid'];
+  const inj = series('inject_n10_qwen37flash', injCfg, injArms, [[100, 100, 0], [100, 100, 0], [100, 100, 0], [100, 100, 100]]);
+  s.addChart(pres.charts.BAR, injArms.map((a, i) => ({ name: a === 'model-verified' ? 'Model + check, no rules' : ARMS.find((x) => x[0] === a)[1], labels: ['Planted labels', '+ reworded text', '+ ids rotated + control moved'], values: inj.vals[i] })), {
     x: M, y: 2.2, w: 7.8, h: 4.25, barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 60,
-    chartColors: [HEX.teal, HEX.charcoal, HEX.navy], showLegend: true, legendPos: 'b', legendFontSize: 12, legendFontFace: '+mn-lt', legendColor: HEX.ink,
-    showValue: true, dataLabelPosition: 'outEnd', dataLabelFontSize: 12, dataLabelFontFace: '+mn-lt', dataLabelColor: HEX.ink, dataLabelFormatCode: '0"%"',
+    chartColors: [HEX.teal, HEX.charcoal, HEX.slate, HEX.navy], showLegend: true, legendPos: 'b', legendFontSize: 12, legendFontFace: '+mn-lt', legendColor: HEX.ink,
+    showValue: true, dataLabelPosition: 'outEnd', dataLabelFontSize: 11, dataLabelFontFace: '+mn-lt', dataLabelColor: HEX.ink, dataLabelFormatCode: '0"%"',
     valAxisMaxVal: 100, valAxisMinVal: 0, valAxisMajorUnit: 25, valAxisLabelFontSize: 12, valAxisLabelFontFace: '+mn-lt', valAxisLabelColor: HEX.slate, valAxisLabelFormatCode: '0"%"',
     catAxisLabelFontSize: 12, catAxisLabelFontFace: '+mn-lt', catAxisLabelColor: HEX.ink, valGridLine: { color: 'E1E6EE', size: 0.75 }, catGridLine: { style: 'none' },
   });
@@ -326,13 +327,13 @@ async function main() {
   card(s, 8.7, 1.85, 4.03, 4.6);
   T(s, 'WHAT TO READ FROM IT', { x: 9.0, y: 2.0, w: 3.5, h: 0.3, fontSize: 11, bold: true, color: C.accent4, charSpacing: 2 });
   T(s, [
-    { text: 'The model is not trusted: it can be fooled, and the next-screen check is what catches it.', options: { bullet: true, breakLine: true } },
-    { text: 'In the hardest mix the ladder alone fails; adding the model rescues it.', options: { bullet: true, breakLine: true } },
-    { text: 'Planted-label taps are counted separately, and the check catches them.', options: { bullet: true, breakLine: true } },
+    { text: 'A bare model is fooled: with reworded text it fails 3 runs of 10, each a silent tap on a planted label.', options: { bullet: true, breakLine: true } },
+    { text: 'With the next-screen check, the model never fails there.', options: { bullet: true, breakLine: true } },
+    { text: 'In the hardest mix only the full system completes (10/10), tapping a planted label twice per run and recovering through the check.', options: { bullet: true, breakLine: true } },
     { text: 'We measure how hostile UIs treat an agent. We do not build evasion.', options: { bullet: true } },
   ], { x: 9.0, y: 2.4, w: 3.5, h: 3.9, fontSize: 14, paraSpaceAfter: 8 });
   if (!inj.real) pill(s, 'ILLUSTRATIVE \u2013 MODEL ARMS BEING RE-RUN', M, 6.55, 4.3, 'amber');
-  s.addNotes('1:30. DOM rotation and tree suppression were slide 8 (B1, B2, B6, B7, B8). This slide is hostile text (B11). Be honest: one fixed, naive injection string on three controls, so say "this planted-label attack", not "prompt injection in general". Replace illustrative values after the re-run publishes: rebuild this deck.');
+  s.addNotes('1:30. DOM rotation and tree suppression were slide 8 (B1, B2, B6, B7, B8). This slide is hostile text (B11). Be honest: one fixed, naive injection string on three controls, so say "this planted-label attack", not "prompt injection in general". Numbers are real (N=10, valid run, harness b0296a44): bare model 7/10 on B11+B9; full system 10/10 on the hardest mix with 2.0 planted taps per run, all caught by the check.');
 
   // ===== 10. Result 3 =====
   s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'Evidence' });

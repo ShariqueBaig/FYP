@@ -198,6 +198,10 @@ def tap(run: Runner, x: int, y: int, serial=None):
     run((["-s", serial] if serial else []) + ["shell", "input", "tap", str(x), str(y)])
 
 
+def swipe(run: Runner, x1: int, y1: int, x2: int, y2: int, duration_ms: int = 350, serial=None):
+    run((["-s", serial] if serial else []) + ["shell", "input", "swipe", str(x1), str(y1), str(x2), str(y2), str(duration_ms)])
+
+
 def type_text(run: Runner, text: str, serial=None):
     run((["-s", serial] if serial else []) + ["shell", "input", "text", input_text_arg(text)])
 

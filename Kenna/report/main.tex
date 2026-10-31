@@ -1,0 +1,191 @@
+% FYP M1 report (software track), short form with figures, in the format of the CSE 49x booklet:
+% title page per the booklet's example, contents, numbered sections, milestone mapping, "AI Tools Used".
+% Build: bash build.sh   (figures are generated from results/published/ by build_figures.py)
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathpazo}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,decorations.pathreplacing}
+\usepackage{url}
+\urlstyle{tt}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+\usepackage[font=small,labelfont=bf]{caption}
+\setlist{itemsep=1pt,topsep=3pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\itshape Beyond MCPs: M1 report}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\parskip}{3pt}
+
+% colours: IBA maroon and gold, neutral greys; pass/fail tints for the grid
+\definecolor{brand}{HTML}{8C2338}
+\definecolor{scriptc}{HTML}{A9AEB6}
+\definecolor{rulesc}{HTML}{B8862F}
+\definecolor{barec}{HTML}{4B5563}
+\definecolor{checkc}{HTML}{7A6A8A}
+\definecolor{fullc}{HTML}{6B1A2A}
+\definecolor{slatec}{HTML}{4A5568}
+\definecolor{slatec2}{HTML}{6B6F78}
+\definecolor{tintc}{HTML}{F6F1F0}
+\definecolor{passc}{HTML}{DDEFE8}
+\definecolor{passt}{HTML}{1F5E4F}
+\definecolor{failc}{HTML}{F8E3D3}
+\definecolor{midc}{HTML}{FBEFD5}
+\definecolor{failt}{HTML}{8A3B0B}
+
+\input{figures_generated.tex}
+
+\begin{document}
+
+% ---------------------------------------------------------------- title page (booklet, section 0.5.2)
+\begin{titlepage}
+\centering
+\vspace*{0.8cm}
+\includegraphics[height=2.6cm]{../assets/logo-iba.jpg}\par
+\vspace{1.6cm}
+{\LARGE\bfseries Beyond MCPs\par}
+\vspace{4pt}
+{\large Self-healing, verified GUI automation for accessible AI assistants\par}
+\vspace{1.2cm}
+{\Large\scshape M1 report: MVP and proposal\par}
+\vspace{4pt}
+{\normalsize CSE 493 -- Final Year Project, Term 1 \quad Software track\par}
+\vspace{1.4cm}
+\begin{tabular}{@{}p{6.2cm}p{6.2cm}@{}}
+\textbf{Authors:} & \textbf{Advisors:}\\[4pt]
+Sharique Baig (28369) & Dr.\ Faisal Iradat\\
+Maira Aijaz (28552) & Pete Herzog (ISECOM)\\
+Barkhi Khan (29261) & \\
+\end{tabular}
+\vfill
+October 29, 2026\par
+\vspace{6pt}
+Department of Computer Science,\\
+School of Mathematics and Computer Science,\\
+Institute of Business Administration, Karachi
+\vspace{1.2cm}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Context}
+Assistants are increasingly asked to operate software through its screen, because many everyday apps expose no API. Where an API or an MCP server exists it should be used; this project is about the apps that offer nothing else. Recorded scripts are the usual tool, and they fail in two ways: one renamed id sends a click nowhere, and a script that never checks the next screen cannot tell that the goal was not reached. For a blind or motor-impaired user, being told ``please do this step yourself'' is not a fallback, so the assistant must be right or say clearly that it is not.
+
+The information a screen reader uses is usually present. On stock Android Settings, 78\% of controls look nameless by their own attributes, but only 2\% are nameless once the labels inside a clickable row are counted (measured with \path{path-b/hierdump.py}).
+
+\FigGlance
+
+\paragraph{Platforms.} Figure~\ref{fig:poster} is the project poster. It sorts platforms into agent-native (APIs and MCP: out of scope), legacy local apps without an API (our target class) and agent-hostile platforms. We evaluated a mock Instagram-style web app and stock Android Settings; Daraz, OLX and Instagram were \emph{not} tested.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[height=8.2cm]{../presentation/assets/poster.jpg}
+\caption{The project poster (earlier wording). Its Phase~2 claims are narrowed by the scope below.}
+\label{fig:poster}
+\end{figure}
+
+\paragraph{Collaboration.} The advisor is Dr.\ Faisal Iradat. The work started from a scoping brief written by a \emph{synthie} (a long-running agent with its own host, identity and owner) about the failures of its own Android automation, and is carried out with Pete Herzog of the Institute for Security and Open Methodologies (ISECOM), an open security research community that published the OSSTMM in 2001.
+
+\paragraph{Scope.} Surviving anti-bot detection is out of scope: we measure how a protection layer treats an agent and fail honestly, but build no evasion. A model is never trusted with an action (Section~\ref{sec:approach}).
+
+\section{Track and milestone}
+The project is on the software track. This report is the M1 checkpoint: a working demonstrator of the core idea and a written proposal.
+
+\begin{table}[H]\centering\small
+\begin{tabular}{p{5.2cm}p{8.6cm}}\toprule
+M1 requirement & Evidence \\ \midrule
+Working demonstrator of the core part & A nine-step flow runs end to end with next-screen checks; an Android layer runs on an emulator. \\
+External integration works & Playwright drives a browser; \texttt{adb} drives an emulator; a language model is called through OpenRouter. \\
+Written proposal & This report, including the plan in Section~\ref{sec:plan}. \\
+AI-tool disclosure & Section~\ref{sec:ai}. \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Approach}\label{sec:approach}
+The tool follows three rules. \textbf{Intent, not locator:} the assistant states a goal such as ``open the create-post flow'', never a button. \textbf{Verify on the next screen:} a step counts only if a predicate on the next screen shows the goal was reached. \textbf{Stop honestly:} if nothing works, the tool says which step failed and why, ending ``You may need to do this step yourself.''
+
+\FigFlow
+
+For each step it tries a ladder of ways to find the control (Figure~\ref{fig:ladder}). The model is asked only when every rule route fails; it may answer only with indices into the on-screen control list, its answer is a candidate judged by the same next-screen check, and an irreversible step (publishing) needs confidence of at least 0.8 and only the first choice. A model answer that passed its check is remembered so the model need not be asked again. The Android layer applies the same ladder to UiAutomator trees and pages a scrollable list when nothing has been tapped and a control may be below the fold. The tool can also say its result aloud, reporting success only when every check passed.
+
+\FigLadder
+
+\section{The demonstrator}
+\begin{itemize}
+\item \texttt{node agent/fyp.mjs run} performs the nine-step create-post flow on the mock app, verified in the feed; flags select UI changes, the recorded-script arm, the model rung and voice.
+\item \texttt{node agent/fyp.mjs experiment} runs arms against UI changes and writes raw logs; reports and figures are built from those logs.
+\item \texttt{python path-b/dashboard.py} is a live Android view.
+\end{itemize}
+A regression set (unit suites, Android self-tests and three end-to-end runs) is run after every change to the harness. It needs only Node~18; there is no GPU requirement.
+
+\section{Evaluation}
+\paragraph{Method.} One nine-step flow on the mock app; a flow \emph{completes} only if every step passes its next-screen check. Eleven controlled UI changes (B1--B11: ids renamed, labels stripped, layout reversed, control duplicated, nested in a scroller, bare icon, overlay, hidden, reworded, relocated, planted instructions) are applied alone and together. Arms: a recorded script, the rules ladder, a bare model acting on its first pick, a model with a check but no rules, and the full system. Each cell is 10 runs with 95\% Wilson intervals~\cite{wilson1927}. The model is qwen3.7-flash at temperature 0 with cached answers, so repeats show variation in the app and harness, not in the model. A run in which any model call failed is invalid and never quoted. Every number below is read from the published logs by a script.
+
+\FigRules
+\paragraph{Result 1: surviving UI change (Figure~\ref{fig:rules}).} On the clean app both arms complete 10/10, so the harness itself is sound. The recorded script drops to 0/10 under B1 (ids renamed), B2 (labels stripped), B6 (bare icon), B7 (overlay) and B8 (control hidden), that is five of the eight single changes; it still completes 10/10 under B3, B4 and B5, because those leave its locator intact. The rules ladder completes 10/10 under seven of the eight single changes and fails only B8, where no route can reach a hidden control. It also completes 10/10 with B1--B4 applied together, where the script scores 0/10. With B1--B7 together, or all eight, both arms score 0/10, and the tool stops and says so rather than guessing. A cell of 10/10 has a 95\% Wilson interval of 72--100\% and 0/10 of 0--28\%, so the gaps between 10/10 and 0/10 are far larger than the sampling noise.
+
+\FigSemantic
+\paragraph{Result 2: drift the rules cannot read (Figure~\ref{fig:semantic}).} Here the model is qwen3.7-flash. With the labels reworded (B9) the rules ladder still completes 10/10 and the bare model 10/10, but once the ids are also rotated the ladder falls to 0/10, the recorded script is already at 0/10, and the bare model also scores 0/10. The model asked without any rules, but with a next-screen check, completes only 5/10 even on the clean app and 5/10 with ids rotated, because it spends its turns on wrong picks. The full system completes 10/10 under reworded labels, rotated ids, and with the control also moved (B10), at a cost of about 7 model calls and 2.4 recovered wrong taps per run in the hardest of these. When the labels are also stripped, no arm completes (0/10 for all), and the full system stops honestly.
+\paragraph{Result 3: planted instructions (Figure~\ref{fig:inject}).} Instructions such as ``ignore the goal'' are planted in control labels (B11). On the clean app and with the planted labels alone, all four arms complete 10/10. With the labels also reworded, the bare model completes only 7/10 (95\% interval 40--89\%); each of the three failures is a silent tap on a planted label, 0.3 per run. The rules ladder, the model with a check, and the full system all stay at 10/10 there. In the hardest mix (ids rotated, control moved) the ladder, the bare model and the model with a check all score 0/10, while the full system completes 10/10, tapping a planted label 2.0 times per run and recovering each time through the next-screen check, with no silent wrong action.
+
+\paragraph{Result 4: no words left (Figure~\ref{fig:vision}).} When B1, B2 and B6 remove every word from the target, the rules ladder and the full system still complete 5/5, but the bare model completes 0/5, both when it is given the screen as text and when it is also given a screenshot with numbered badges (on the clean app it completes 5/5 in text and 4/5 with the screenshot). With the control also moved every arm scores 0/5 and the full system stops honestly with no silent error. Each vision cell has only five runs, so 5/5 has an interval of only 57--100\% and 0/5 of 0--43\%; the screenshot result should be read as ``no improvement seen'', not as proof that vision cannot help.
+
+\paragraph{Result 5: Android Settings (Figure~\ref{fig:android}).} On the emulator, with success judged by page identity rather than by words, all arms complete 10/10 intents in English. When the system language is French the rules alone complete 2/10 (20\%, interval 6--51\%), while the full system completes 10/10 using 8 model calls and no silent wrong action. With the font scaled by 1.6 every arm, including the bare model, completes 8/10: two rows fall below the fold and no arm scrolls yet, which is a known gap.
+
+\paragraph{Result 6: coverage and route memory (Figures~\ref{fig:glance} and~\ref{fig:learn}).} On stock Android Settings 78\% of controls have no name by their own attributes but only 2\% once the labels inside a clickable row are counted, which is why a tool that reads the way a screen reader does can find most controls. With route memory, a route found by the model after a UI change is remembered; the first run after the change asks the model, and later runs make no model calls.
+
+\FigInject
+\FigVision
+\FigLearn
+\FigAndroid
+
+\section{Limitations}
+\begin{itemize}
+\item One model, one mock app and stock Settings; nothing on Daraz, OLX or Instagram; no user study with screen-reader users.
+\item Cached repetitions measure app and harness variation, not model variation.
+\item Our test harness once let state leak between arms (a bare model looked broken on a clean app). We proved it on a fresh page and fixed the harness.
+\item A later route can re-tap a control an earlier route already tapped; this is recorded for M2.
+\end{itemize}
+
+\section{Team contribution}\label{sec:team}
+The three members worked on every part of the project together: the design, the experiments and this report were planned jointly, every change was reviewed by at least one other member, and each member can explain and modify any component. For accountability the work was divided into three areas, each led by one member with the other two contributing.
+
+\begin{table}[H]\centering\small
+\begin{tabular}{p{3.2cm}p{4.4cm}p{6.2cm}}\toprule
+Member & Area led & Shared with the other two \\ \midrule
+Sharique Baig & Core harness: intents, the ladder of routes, next-screen checks, the model rung and its safety rules & Designing the intents and breaks B1--B11; reviewing the Android layer and the evaluation; writing and checking the report \\
+Maira Aijaz & Evaluation: experiment design, UI-change sets, published logs, tables, figures with confidence intervals, and the report build & Reviewing the harness and the Android layer; running the live tests; writing and checking the report \\
+Barkhi Khan & Android layer: \texttt{adb} capture, the ladder on UiAutomator trees, the live dashboard and voice feedback & Testing the web flow and the model rung; running experiments; writing and checking the report \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Plan for M2 to M5}\label{sec:plan}
+\begin{table}[H]\centering\small
+\begin{tabular}{p{2.6cm}p{11.2cm}}\toprule
+Milestone & Planned work \\ \midrule
+M2 & A second model; scrolling and more intents measured with $N\ge10$; planted-instruction and vision results; a second app; each member can explain or modify any component unaided. \\
+M3 & Present the M2 build to the external jury; explore a CEDIR hand-off. \\
+M4 & Real users outside the group, including a study with screen-reader users (with advisor approval); edge-case, security and accessibility review. \\
+M5 & Final report and defense, with evaluation method, design rationale and AI disclosure. \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{AI Tools Used}\label{sec:ai}
+Claude Code (Anthropic's coding agent) was used throughout for writing source code, generating tests, running experiments and reading their logs, and drafting documentation, including this report. The language model inside the system (qwen3.7-flash via OpenRouter) is the subject of the experiments, not a development aid. The team states the proportion: about 60\% of the code and of this text was produced with AI assistance and about 40\% by the team's own hand, all under the team's direction and review. Every figure is read from published logs, and each author is expected to explain and modify any component without tool assistance.
+
+\begin{thebibliography}{9}
+\bibitem{wilson1927} E.~B.~Wilson, ``Probable inference, the law of succession, and statistical inference,'' \emph{J.\ American Statistical Association}, 22(158):209--212, 1927.
+\bibitem{booklet} Department of Computer Science, IBA Karachi, \emph{CSE 49x -- Final Year Project: Philosophy, processes and practices}, August 2026.
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-29T17:15:03.802Z",
+  "git": {
+    "commit": "5773e72137cef4210f9aea1fc56de2e9cc372879",
+    "dirty": true
+  },
+  "harnessSha256": "b0296a44341c735d00fa2e1d46621b45a60c0af79d4cc19d12c6fcaf85583c8b",
+  "command": "fyp.mjs experiment --n 5 --set vision --arms healed,llm-only,hybrid --semantic-shot --semantic openrouter --semantic-model qwen/qwen3.7-flash --semantic-cache agent/results/protocol/cache_vision_shot_n5_qwen_qwen3_7-flash.json --out agent/results/protocol/vision_shot_n5_qwen_qwen3_7-flash",
+  "set": "vision",
+  "arms": [
+    "healed",
+    "llm-only",
+    "hybrid"
+  ],
+  "n": 5,
+  "semantic": {
+    "enabled": true,
+    "provider": "openrouter:qwen/qwen3.7-flash",
+    "calls": 155,
+    "errors": 0,
+    "cacheHits": 108,
+    "inputTokens": 370486,
+    "outputTokens": 21294,
+    "modelMs": 319545
+  },
+  "valid": true,
+  "invalidReason": null,
+  "env": "node v24.11.1, win32",
+  "semanticBridge": {
+    "calls": 47,
+    "cacheHits": 108,
+    "errors": 0,
+    "lastError": "",
+    "costUsd": 0.0042572170000000015
+  },
+  "viewport": "410x779"
+}

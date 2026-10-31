@@ -80,6 +80,7 @@ if (!cmd || args.help) {
     'fyp.mjs intent <intent.id> [--caption "text"]',
     'fyp.mjs survey',
     'fyp.mjs experiment [--n 3] [--set demo|full|semantic|inject|vision] [--arms baseline,healed,llm-only,model-verified,hybrid] [--semantic offline|anthropic] [--out dir]',
+    'fyp.mjs run [...] [--speak] [--speak-steps]   say the result aloud ("Task completed successfully" / "I could not finish ..."); --speak-steps also reads every step',
     'fyp.mjs say "post a photo with caption hello" [--speak]   plain English in; one JSON out (+ a sentence to read aloud)',
     'fyp.mjs teach --name like.first --say "like the first post" --headed   do a task ONCE by hand; Enter to finish; it learns the steps + a check for each',
     'fyp.mjs routines                   what has been taught',
@@ -266,6 +267,15 @@ try {
     if (opts.arm === 'llm-only' && !sem.bridge) await finish({ ok: false, error: 'usage', userMessage: '--arm llm-only needs a model: add --semantic offline or --semantic anthropic.' }, 2);
     log('run', JSON.stringify(opts));
     const res = await call('runFlow', opts);
+    if (args.speak || args['speak-steps']) {
+      // Voice feedback (agent/speak.mjs): the closing sentence, and with --speak-steps every step too.
+      // Loaded only on request, so a plain run is unchanged.
+      const { narrate } = await import('./speak.mjs');
+      const d = await call('describe');
+      const descs = Object.fromEntries(((d && d.intents) || []).map((i) => [i.id, i.desc]));
+      res.spoken = narrate(res, { steps: !!args['speak-steps'], descs });
+      speakIt = true;
+    }
     if (sem.bridge) { res.semantic = await semanticStats(); Object.assign(res, validity()); }
     if (typeof args.shot === 'string') {
       await page.screenshot({ path: args.shot });

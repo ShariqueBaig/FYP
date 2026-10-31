@@ -207,6 +207,27 @@
     return hash(bgs.join('|'));
   }
 
+  /** URL of the largest background image on screen: the big preview in the gallery. */
+  function galleryPreview() {
+    let best = null, area = 0;
+    for (const el of document.querySelectorAll('*')) {
+      if (el.closest('#' + PANEL_ID)) continue;
+      const bg = getComputedStyle(el).backgroundImage;
+      if (!bg || bg === 'none' || !bg.includes('url')) continue;
+      const r = el.getBoundingClientRect();
+      const a = r.width * r.height;
+      if (a > 20000 && a > area) { best = bg; area = a; }
+    }
+    const m = best && best.match(/url\("?([^")]+)/);
+    return m ? m[1] : null;
+  }
+  // The app starts every page with one photo chosen. Remember it the first time the gallery is read (fresh page,
+  // before any selection) so a reset can put it back (see clearLeftoverSwitch).
+  function gallerySignatureRemembering() {
+    if (state.defaultPreview === undefined) state.defaultPreview = galleryPreview();
+    return gallerySignature();
+  }
+
   /** First non-transparent background colour found inside an element. */
   function anyBackground(el) {
     const walk = (n) => {
@@ -341,7 +362,7 @@
       visionSweep: true,
       // Capture the selection signature first; success = it changed. Hook-free,
       // so stripping every testID cannot make this predicate lie.
-      capture: gallerySignature,
+      capture: gallerySignatureRemembering,
       success: (it) => !!it._before && gallerySignature() !== it._before,
       successDesc: 'the chosen photo changed (the preview followed it)',
     },
@@ -1029,7 +1050,7 @@
     // A baseline RECORDING pass is not an experiment result - it is the act of
     // writing the script. Logging it would double every row in the scoreboard.
     if (state.recording) return row;
-    if (row.intent === 'setting.toggle') state.switchDirty = true;   // the app keeps the switch on after publishing (see clearLeftoverSwitch)
+    if (row.intent === 'setting.toggle' || row.intent === 'gallery.select') state.switchDirty = true;   // the app keeps the switch and the chosen photo between runs (see clearLeftoverSwitch)
     row.timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
     if (state.armLabel && !row.arm) row.arm = state.armLabel;   // experiment arms beyond baseline / healed
     row.run = state.runId;
@@ -1332,7 +1353,7 @@
     running = true;
     state.runId++;
     state.runs.baseline = null;
-    if (!state.exp.active) state.stop = false;
+    if (!state.exp.active) { state.stop = false; state.exp.stop = false; }   // Stop sets both flags; only an experiment used to clear exp.stop, so after one Stop every later run halted at once
     render();
 
     // Reset (which ensures the recording exists), then re-arm the breaks. The
@@ -1420,7 +1441,7 @@
     running = true;
     state.runId++;
     state.runs.llmOnly = null;
-    if (!state.exp.active) state.stop = false;
+    if (!state.exp.active) { state.stop = false; state.exp.stop = false; }   // Stop sets both flags; only an experiment used to clear exp.stop, so after one Stop every later run halted at once
     render();
     const armed = Object.keys(state.chaos.active);
     await resetApp();
@@ -1544,7 +1565,7 @@
     state.runs.healed = null;
     state.lastFatal = '';
     state.lastShot = null;
-    if (!state.exp.active) state.stop = false;
+    if (!state.exp.active) { state.stop = false; state.exp.stop = false; }   // Stop sets both flags; only an experiment used to clear exp.stop, so after one Stop every later run halted at once
     render();
 
     // Order matters. Reset needs intact hooks to navigate home, and the run must
@@ -1685,7 +1706,7 @@
       : { ok: false, needsUser: true, error: 'login-failed', userMessage: loginWhy };
   }
 
-  // After a published post the app keeps the "Add AI label" switch ON in memory, but the switch is
+  // After a published post the app keeps the "Add AI label" switch ON (and the chosen photo) in memory, but the switch is
   // not in the DOM on the feed, so goHome() cannot turn it off. An arm that taps it blindly (llm-only)
   // then flipped it OFF and was scored as failed on a clean app. Open the caption screen once, so
   // goHome() can switch it off, before the next arm starts. Same start state for every arm.
@@ -1699,6 +1720,17 @@
       if (!create) return;
       realClick(create.el);
       await sleep(500);
+      // The app also keeps the chosen photo. Put the photo a fresh page starts with back, so the next arm sees the
+      // same gallery; otherwise a model that picks the already-selected photo changes nothing and its step fails
+      // for a reason that has nothing to do with the arm. Cell order is not stable, so sweep until the preview matches.
+      if (state.defaultPreview && galleryPreview() !== state.defaultPreview) {
+        const cells = collect().filter((c) => inRegion(c, 'gallery-grid') && hasImage(c.el)).sort((a, b) => (a.box.cy - b.box.cy) || (a.box.cx - b.box.cx));
+        for (const c of cells) {
+          realClick(c.el);
+          await sleep(350);
+          if (galleryPreview() === state.defaultPreview) break;
+        }
+      }
       const next = hook('compose-next');
       if (next) { realClick(next.el); await sleep(500); }
     } catch (e) {}

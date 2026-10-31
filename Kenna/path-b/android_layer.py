@@ -75,9 +75,51 @@ class Row:
     semantic_calls: int = 0
 
 
+_GOALS = {}
+
+
+def intent_sentence(goal, outcome):
+    """What is said aloud for one finished intent. Mirrors agent/speak.mjs: "Done" only when the check passed."""
+    g = " ".join(str(goal or "").split())
+    if outcome == "success":
+        return "Done. %s." % g
+    return "I could not do this: %s. I stopped instead of guessing. You may need to do it yourself." % (g[:1].lower() + g[1:])
+
+
+def speak_aloud(text, run=None, platform=None):
+    """The machine's own voice (Windows System.Speech, macOS say, Linux espeak/spd-say). Blocks, so sentences keep order."""
+    import subprocess as _sp
+    import sys as _sys
+    run, platform, t = run or _sp.run, platform or _sys.platform, " ".join(str(text or "").split())
+    if not t:
+        return False
+    try:
+        if platform.startswith("win"):
+            run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                 "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak($env:FYP_SAY)"],
+                env=dict(os.environ, FYP_SAY=t), stdout=_sp.DEVNULL, stderr=_sp.DEVNULL, timeout=60)
+            return True
+        if platform == "darwin":
+            run(["say", t], stdout=_sp.DEVNULL, stderr=_sp.DEVNULL, timeout=60)
+            return True
+        for cmd in (["spd-say", "-w", t], ["espeak", t]):
+            try:
+                run(cmd, stdout=_sp.DEVNULL, stderr=_sp.DEVNULL, timeout=60)
+                return True
+            except FileNotFoundError:
+                continue
+    except Exception:                                    # noqa: BLE001 - a missing voice must never break a run
+        pass
+    return False
+
+
 def emit(event, **kw):
     """Append one JSON line to $FYP_EVENTS (read by dashboard.py). No-op when unset. FYP_PACE=<seconds> slows
-    the run after each action so an audience can follow it."""
+    the run after each action so an audience can follow it. FYP_SPEAK=1 also says each finished intent aloud."""
+    if event == "intent-start":
+        _GOALS[kw.get("intent")] = kw.get("goal")
+    if event == "intent-end" and os.environ.get("FYP_SPEAK") == "1":
+        speak_aloud(intent_sentence(_GOALS.get(kw.get("intent")) or kw.get("intent"), kw.get("outcome")))
     path = os.environ.get("FYP_EVENTS")
     if not path:
         return
@@ -123,6 +165,33 @@ def _screen(nodes):
     x2 = max((n.bounds[2] for n in nodes), default=1) or 1
     y2 = max((n.bounds[3] for n in nodes), default=1) or 1
     return x2, y2
+
+
+MAX_SCROLLS = 4          # how far the layer will page a list looking for a control it cannot see
+
+
+def tree_signature(nodes):
+    """What is on screen, as a comparable value: used to notice that a scroll moved nothing (end of the list)."""
+    return tuple((n.cls, n.text, n.desc, n.bounds) for n in nodes)
+
+
+def scroll_target(nodes):
+    """The scrollable container to page: the largest one on screen. The accessibility tree says which one scrolls."""
+    best, area = None, 0
+    for n in nodes:
+        if n.scrollable and n.displayed:
+            a = max(0, n.bounds[2] - n.bounds[0]) * max(0, n.bounds[3] - n.bounds[1])
+            if a > area:
+                best, area = n, a
+    return best
+
+
+def swipe_for(container):
+    """Finger path that pages a list forward: from low in the container to high, down its middle."""
+    x0, y0, x1, y1 = container.bounds
+    cx = (x0 + x1) // 2
+    h = y1 - y0
+    return cx, y0 + int(h * 0.78), cx, y0 + int(h * 0.28)
 
 
 # ---------------------------------------------------------------------------
@@ -559,6 +628,30 @@ class Layer:
         emit("intent-start", intent=it.id, goal=it.desc, success=it.success_desc, controls=len(cs), routes=ROUTES,
              looking_for={k: v for k, v in (("id", it.rid), ("label", it.content_desc), ("text", it.text), ("container", it.anchor)) if v},
              onscreen=[(n.text or n.name or n.desc or "")[:24].strip() for n in cs[:12]])
+        scrolls = 0
+        while True:
+            row, nodes, cs, wasted = self._routes(it, nodes, cs, attempts, wasted, calls0)
+            if row:
+                return row
+            # Nothing worked. If we have not touched anything (no wasted tap, so the screen is as we found it) and the
+            # control may simply be below the fold, page the list and try again. A scroll is never a way round a failed tap.
+            if wasted or scrolls >= MAX_SCROLLS or not hasattr(self.driver, "scroll"):
+                break
+            moved = self.driver.scroll(nodes)
+            if not moved:
+                break
+            scrolls += 1
+            attempts.append("scroll(%d)" % scrolls)
+            emit("scroll", intent=it.id, n=scrolls, controls=len(controls(moved)))
+            nodes, cs = moved, controls(moved)
+        row = Row(it.id, "failed-absent", route="none", failed_actions=wasted,
+                  semantic_calls=self.semantic_calls - calls0,
+                  detail="every route was tried and none achieved the goal: " + ", ".join(attempts))
+        emit("intent-end", intent=it.id, outcome=row.outcome, route=row.route, wasted=wasted, model_calls=row.semantic_calls, detail=row.detail)
+        return row
+
+    def _routes(self, it, nodes, cs, attempts, wasted, calls0):
+        """One pass down the ladder on what is on screen now. Returns (row or None, nodes, cs, wasted)."""
         for route in ROUTES:
             hits = self._candidates(route, it, cs, nodes)
             multi = route == "semantic"
@@ -592,17 +685,12 @@ class Layer:
                               semantic_calls=self.semantic_calls - calls0,
                               detail="recovered on %s after: %s" % (tag, ", ".join(attempts)) if attempts else it.success_desc)
                     emit("intent-end", intent=it.id, outcome=row.outcome, route=row.route, wasted=wasted, model_calls=row.semantic_calls, detail=row.detail)
-                    return row
+                    return row, nodes, cs, wasted
                 attempts.append(f"{tag}(no effect)")
                 wasted += 1
                 nodes = after
                 cs = controls(nodes)
-        row = Row(it.id, "failed-absent", route="none", failed_actions=wasted,
-                  semantic_calls=self.semantic_calls - calls0,
-                  detail="every route was tried and none achieved the goal: " + ", ".join(attempts))
-        emit("intent-end", intent=it.id, outcome=row.outcome, route=row.route, wasted=wasted, model_calls=row.semantic_calls, detail=row.detail)
-        return row
-
+        return None, nodes, cs, wasted
 
     def run_llm_only(self, it: Intent) -> Row:
         """The comparison arm 'just ask the model': act on its FIRST choice and stop. No uniqueness test, no
@@ -662,6 +750,16 @@ class AdbDriver:
         self.tap(n)
         self.ac.type_text(self.run, text, self.serial)
 
+    def scroll(self, nodes):
+        """Page the screen's main scrollable container once. Returns the new tree, or None when nothing can scroll
+        or the screen did not change (the end of the list)."""
+        box = scroll_target(nodes)
+        if box is None:
+            return None
+        self.ac.swipe(self.run, *swipe_for(box), serial=self.serial)
+        after = self.dump()
+        return None if tree_signature(after) == tree_signature(nodes) else after
+
 
 # ---------------------------------------------------------------------------
 # Selftest: a SYNTHETIC app that emits UiAutomator-shaped XML, with the same kinds of
@@ -678,6 +776,7 @@ class FakeApp:
     def __init__(self, drift=()):
         self.drift, self.screen, self.caption, self.posted = set(drift), "feed", "", False
         self.taps = []
+        self.scrolled = 0                       # 'fold' drift: the Share button is below the fold until scrolled twice
 
     def _n(self, key, cls, rid, desc, text, b, clickable=True, hint=""):
         if "rid" in self.drift and rid:
@@ -707,14 +806,20 @@ class FakeApp:
                    [self._n("cell%d" % i, "android.widget.ImageView", "com.fake:id/cell", "Photo %d" % (i + 1), "", (i % 3 * 360, 500 + i // 3 * 360, i % 3 * 360 + 358, 500 + i // 3 * 360 + 358)) for i in range(6)]
         return [self._n("back", "android.widget.ImageView", "com.fake:id/back", "Back", "", (20, 60, 140, 180)),
                 self._n("caption", "android.widget.EditText", "com.fake:id/caption_input", "", self.caption, (40, 300, W - 40, 700), hint="Write a caption"),
-                self._n("share", "android.widget.TextView", "com.fake:id/share_btn", "", "Share", (40, H - 300, W - 40, H - 150))]
+                self._n("share", "android.widget.TextView", "com.fake:id/share_btn", "", "Share", (40, H - 300, W - 40, H - 150))] \
+            if "fold" not in self.drift or self.scrolled >= 2 else \
+               [self._n("back", "android.widget.ImageView", "com.fake:id/back", "Back", "", (20, 60, 140, 180)),
+                self._n("caption", "android.widget.EditText", "com.fake:id/caption_input", "", self.caption, (40, 300, W - 40, 700), hint="Write a caption")]
 
     def dump_xml(self):
         self.cur = self._nodes()
+        if "fold" in self.drift:                # each page of the list reads differently, as a real list does
+            self.cur.append(self._n("page", "android.widget.TextView", "", "", "page %d" % self.scrolled, (0, 1900, 200, 1950), clickable=False))
         if "move" in self.drift:                # a relocated control is drawn on top, as a real redesign would
             self.cur.sort(key=lambda kv: kv[0] in ("create", "next", "share"))
+        scrollable = "true" if "fold" in self.drift else "false"
         return ('<?xml version="1.0" encoding="UTF-8"?><hierarchy rotation="0"><node class="android.widget.FrameLayout" '
-                'bounds="[0,0][%d,%d]" clickable="false">%s</node></hierarchy>' % (self.W, self.H, "".join(x for _, x in self.cur)))
+                'bounds="[0,0][%d,%d]" clickable="false" scrollable="%s">%s</node></hierarchy>' % (self.W, self.H, scrollable, "".join(x for _, x in self.cur)))
 
     def press(self, key):
         self.taps.append(key)
@@ -754,6 +859,14 @@ class FakeDriver:
     def type(self, n, text):
         if self._key(n) == "caption":
             self.app.caption = text
+
+    def scroll(self, nodes):
+        box = scroll_target(nodes)
+        if box is None:
+            return None
+        self.app.scrolled = min(self.app.scrolled + 1, 2)      # the list is two pages long
+        after = self.dump()
+        return None if tree_signature(after) == tree_signature(nodes) else after
 
 
 def demo_intents(caption):
@@ -804,6 +917,21 @@ def selftest():
     check("and the post is really in the feed (end state, not the step checks)", app.posted and app.caption == "hello kenna")
     check("model asked only where rules failed", sum(r.semantic_calls for r in rows) < 8 and rows[0].semantic_calls >= 1, [r.semantic_calls for r in rows])
 
+    print("scrolling")
+    rows, app, _ = run_flow({"fold"})
+    check("control below the fold: paged until found, then the flow completes", len(rows) == 4 and all(r.outcome == "success" for r in rows) and app.posted and app.scrolled == 2,
+          [(r.route, r.outcome, r.detail[:70]) for r in rows])
+    check("the scroll is in the audit trail", "scroll(" in rows[-1].detail, rows[-1].detail)
+    ly3 = Layer(FakeDriver(FakeApp({"fold"})))
+    ly3.driver.app.screen = "caption"
+    ghost = Intent("settings.teleporter", "Open the quantum teleporter settings", text="Quantum teleporter", success=lambda ns: False, success_desc="never")
+    r = ly3.run_intent(ghost)
+    check("a control that is not there: scrolls to the end, taps nothing, stops honestly", r.outcome == "failed-absent" and r.failed_actions == 0 and not ly3.driver.app.taps and ly3.driver.app.scrolled == 2, (r.detail, ly3.driver.app.taps))
+    ly4 = Layer(FakeDriver(FakeApp(())))
+    ly4.driver.app.screen = "caption"
+    r = ly4.run_intent(ghost)
+    check("nothing scrollable on screen: no scroll attempted", r.outcome == "failed-absent" and ly4.driver.app.scrolled == 0, r.detail)
+
     print("memory distils a model answer")
     ly = Layer(None, offline_semantic, memory=True)
     drift = reskin
@@ -847,6 +975,13 @@ def selftest():
     except ValueError:
         rejected = True
     check("make_semantic rejects an unknown provider", rejected)
+
+    print("voice feedback")
+    check("a done intent is spoken as done", intent_sentence("Open the battery settings", "success") == "Done. Open the battery settings.")
+    check("a failed intent is never spoken as done", "Done" not in intent_sentence("Open the battery settings", "failed-absent") and "yourself" in intent_sentence("x", "failed-absent"))
+    said = []
+    check("speech uses powershell on windows with the text in the environment", speak_aloud("hi  there", run=lambda c, **k: said.append((c[0], k["env"]["FYP_SAY"])), platform="win32") and said[0] == ("powershell.exe", "hi there"))
+    check("a missing voice never breaks a run", speak_aloud("hi", run=lambda c, **k: (_ for _ in ()).throw(FileNotFoundError()), platform="linux") is False)
 
     print("hierdump interop")
     nodes = hd.parse(FakeApp(()).dump_xml())

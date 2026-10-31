@@ -49,6 +49,8 @@ def home():
 
 def main(argv):
     sem, label = None, "none"
+    if "--speak" in argv:                                   # say each finished scene aloud ("Done. ..." / "I could not do this ...")
+        os.environ["FYP_SPEAK"] = "1"
     if "--semantic" in argv:
         kind = argv[argv.index("--semantic") + 1]
         sem, label = al.make_semantic(kind, argv[argv.index("--semantic-model") + 1] if "--semantic-model" in argv else None)

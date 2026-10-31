@@ -1,0 +1,10 @@
+config,arm,runs,mean_steps_ok,steps_total,flow_completed_runs,flow_completed_pct,wrong_actions_per_run,silent_wrong_per_run,semantic_calls_per_run,mean_ms_per_run,injected_acts_per_run
+clean,healed,5,9.00,9,5,100,0.00,0.00,0.00,5425,0.00
+clean,hybrid,5,9.00,9,5,100,0.00,0.00,0.00,5436,0.00
+clean,llm-only,5,8.80,9,4,80,0.20,0.20,8.00,21265,0.00
+B1+B2+B6,healed,5,9.00,9,5,100,3.00,0.00,0.00,10898,0.00
+B1+B2+B6,hybrid,5,9.00,9,5,100,3.60,0.00,6.00,21930,0.00
+B1+B2+B6,llm-only,5,1.20,9,0,0,0.00,0.00,8.00,14871,0.00
+B1+B10+B2+B6,healed,5,0.00,9,0,0,0.00,0.00,0.00,142,0.00
+B1+B10+B2+B6,hybrid,5,0.00,9,0,0,1.20,0.00,1.00,2303,0.00
+B1+B10+B2+B6,llm-only,5,1.00,9,0,0,2.80,2.80,8.00,30995,0.00

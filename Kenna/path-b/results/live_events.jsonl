@@ -1,20 +1,107 @@
-{"model": "offline-lexical STUB", "stub": true, "total": 5, "event": "run-start", "t": 1793281851.8511202}
-{"n": 1, "total": 5, "id": 1, "title": "1 - As taught", "say": "The assistant was taught the row is called 'Network & internet'. The plain text way finds it.", "expect": "success", "event": "scene", "t": 1793281851.8511202}
-{"intent": "settings.network", "goal": "Open the network and internet settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "looking_for": {"text": "Network & internet"}, "onscreen": ["Profile picture, double", "Search settings", "Network & internet Mobil", "Connected devices Blueto", "Apps Assistant, recent a", "Notifications Notificati", "Battery 100%", "Storage 33% used - 5.40", "Sound & vibration Volume"], "event": "intent-start", "t": 1793281862.8179274}
-{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793281862.8189259}
-{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793281862.8189259}
-{"intent": "settings.network", "route": "text", "hits": 1, "usable": true, "query": "Network & internet", "examples": ["Network & internet Mobile, Wi\u2011Fi, hotspo"], "event": "route", "t": 1793281862.8199258}
-{"intent": "settings.network", "route": "text", "x0": 0.0, "y0": 0.32083333333333336, "x1": 1.0, "y1": 0.4170833333333333, "label": "Network & internet Mobile, Wi\u2011Fi, hotspot", "event": "act", "t": 1793281862.8199258}
-{"intent": "settings.network", "route": "text", "ok": true, "says": "", "event": "check", "t": 1793281873.0565226}
-{"intent": "settings.network", "outcome": "success", "route": "text", "wasted": 0, "model_calls": 0, "detail": "recovered on text after: resource-id(0), content-desc(0)", "event": "intent-end", "t": 1793281874.6581748}
-{"n": 2, "total": 5, "id": 2, "title": "2 - Words changed, model rescues", "say": "The row is now called differently from what was taught. Rules cannot find it, so the model is asked and its pick is checked.", "expect": "success", "event": "scene", "t": 1793281876.2591474}
-{"intent": "settings.network", "goal": "Open the network and internet settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "looking_for": {"text": "Connectivity"}, "onscreen": ["Profile picture, double", "Search settings", "Network & internet Mobil", "Connected devices Blueto", "Apps Assistant, recent a", "Notifications Notificati", "Battery 100%", "Storage 33% used - 5.40", "Sound & vibration Volume"], "event": "intent-start", "t": 1793281886.329213}
-{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793281886.330213}
-{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793281886.330213}
-{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "query": "Connectivity", "examples": [], "event": "route", "t": 1793281886.330213}
-{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793281886.3312156}
-{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793281886.3312156}
-{"intent": "settings.network", "options": 9, "event": "model-ask", "t": 1793281886.3312156}
-{"intent": "settings.network", "picks": [{"x0": 0.0, "y0": 0.32083333333333336, "x1": 1.0, "y1": 0.4170833333333333, "label": "Network & internet Mobile, Wi\u2011Fi, hotspot", "i": 2, "confidence": 0.8500000000000001}, {"x0": 0.03888888888888889, "y0": 0.24625, "x1": 0.9611111111111111, "y1": 0.30333333333333334, "label": "Search settings", "i": 1, "confidence": 0.64}, {"x0": 0.825, "y0": 0.11458333333333333, "x1": 0.9416666666666667, "y1": 0.16708333333333333, "label": "Profile picture, double tap to open Google Account", "i": 0, "confidence": 0.6271428571428572}], "event": "model-answer", "t": 1793281886.3382137}
-{"intent": "settings.network", "route": "semantic", "hits": 3, "usable": true, "query": "", "examples": ["Network & internet Mobile, Wi\u2011Fi, hotspo", "Search settings", "Profile picture, double tap to open Goog"], "event": "route", "t": 1793281886.3382137}
-{"intent": "settings.network", "route": "semantic[0]", "x0": 0.0, "y0": 0.32083333333333336, "x1": 1.0, "y1": 0.4170833333333333, "label": "Network & internet Mobile, Wi\u2011Fi, hotspot", "event": "act", "t": 1793281886.339214}
+{"model": "offline-lexical STUB", "stub": true, "total": 5, "event": "run-start", "t": 1793336904.7935326}
+{"n": 1, "total": 5, "id": 1, "title": "1 - As taught", "say": "The assistant was taught the row is called 'Network & internet'. The plain text way finds it.", "expect": "success", "event": "scene", "t": 1793336904.7945318}
+{"intent": "settings.network", "goal": "Open the network and internet settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "looking_for": {"text": "Network & internet"}, "onscreen": ["Profile picture, double", "Search settings", "Network & internet Mobil", "Connected devices Blueto", "Apps Assistant, recent a", "Notifications Notificati", "Battery 100%", "Storage 33% used - 5.40", "Sound & vibration Volume"], "event": "intent-start", "t": 1793336916.4603305}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336916.4613328}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336916.4613328}
+{"intent": "settings.network", "route": "text", "hits": 1, "usable": true, "query": "Network & internet", "examples": ["Network & internet Mobile, Wi\u2011Fi, hotspo"], "event": "route", "t": 1793336916.4623566}
+{"intent": "settings.network", "route": "text", "x0": 0.0, "y0": 0.32083333333333336, "x1": 1.0, "y1": 0.4170833333333333, "label": "Network & internet Mobile, Wi\u2011Fi, hotspot", "event": "act", "t": 1793336916.4633396}
+{"intent": "settings.network", "route": "text", "ok": true, "says": "", "event": "check", "t": 1793336928.5004375}
+{"intent": "settings.network", "outcome": "success", "route": "text", "wasted": 0, "model_calls": 0, "detail": "recovered on text after: resource-id(0), content-desc(0)", "event": "intent-end", "t": 1793336930.1012948}
+{"n": 2, "total": 5, "id": 2, "title": "2 - Words changed, model rescues", "say": "The row is now called differently from what was taught. Rules cannot find it, so the model is asked and its pick is checked.", "expect": "success", "event": "scene", "t": 1793336931.7026286}
+{"intent": "settings.network", "goal": "Open the network and internet settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "looking_for": {"text": "Connectivity"}, "onscreen": ["Profile picture, double", "Search settings", "Network & internet Mobil", "Connected devices Blueto", "Apps Assistant, recent a", "Notifications Notificati", "Battery 100%", "Storage 33% used - 5.40", "Sound & vibration Volume"], "event": "intent-start", "t": 1793336943.0915787}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336943.0925708}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336943.0933833}
+{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "query": "Connectivity", "examples": [], "event": "route", "t": 1793336943.0935616}
+{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336943.0945656}
+{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336943.0945656}
+{"intent": "settings.network", "options": 9, "event": "model-ask", "t": 1793336943.09566}
+{"intent": "settings.network", "picks": [{"x0": 0.0, "y0": 0.32083333333333336, "x1": 1.0, "y1": 0.4170833333333333, "label": "Network & internet Mobile, Wi\u2011Fi, hotspot", "i": 2, "confidence": 0.8500000000000001}, {"x0": 0.03888888888888889, "y0": 0.24625, "x1": 0.9611111111111111, "y1": 0.30333333333333334, "label": "Search settings", "i": 1, "confidence": 0.64}, {"x0": 0.825, "y0": 0.11458333333333333, "x1": 0.9416666666666667, "y1": 0.16708333333333333, "label": "Profile picture, double tap to open Google Account", "i": 0, "confidence": 0.6271428571428572}], "event": "model-answer", "t": 1793336943.1116123}
+{"intent": "settings.network", "route": "semantic", "hits": 3, "usable": true, "query": "", "examples": ["Network & internet Mobile, Wi\u2011Fi, hotspo", "Search settings", "Profile picture, double tap to open Goog"], "event": "route", "t": 1793336943.1128418}
+{"intent": "settings.network", "route": "semantic[0]", "x0": 0.0, "y0": 0.32083333333333336, "x1": 1.0, "y1": 0.4170833333333333, "label": "Network & internet Mobile, Wi\u2011Fi, hotspot", "event": "act", "t": 1793336943.11457}
+{"intent": "settings.network", "route": "semantic[0]", "ok": true, "says": "", "event": "check", "t": 1793336954.3821435}
+{"intent": "settings.network", "outcome": "success", "route": "semantic[0]", "wasted": 0, "model_calls": 1, "detail": "recovered on semantic[0] after: resource-id(0), content-desc(0), text(0), scoped(0), learned(0)", "event": "intent-end", "t": 1793336955.9832535}
+{"n": 3, "total": 5, "id": 3, "title": "3 - Control not there, honest stop", "say": "Nothing on screen matches. The assistant must stop and say so, not tap something random.", "expect": "stop", "event": "scene", "t": 1793336957.5851724}
+{"intent": "settings.teleporter", "goal": "Open the quantum teleporter settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "looking_for": {"text": "Quantum teleporter"}, "onscreen": ["Profile picture, double", "Search settings", "Network & internet Mobil", "Connected devices Blueto", "Apps Assistant, recent a", "Notifications Notificati", "Battery 100%", "Storage 33% used - 5.40", "Sound & vibration Volume"], "event": "intent-start", "t": 1793336968.8659973}
+{"intent": "settings.teleporter", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336968.8659973}
+{"intent": "settings.teleporter", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336968.8670495}
+{"intent": "settings.teleporter", "route": "text", "hits": 0, "usable": false, "query": "Quantum teleporter", "examples": [], "event": "route", "t": 1793336968.868068}
+{"intent": "settings.teleporter", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336968.868068}
+{"intent": "settings.teleporter", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336968.8690684}
+{"intent": "settings.teleporter", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793336968.8700702}
+{"intent": "settings.teleporter", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336968.8700702}
+{"intent": "settings.teleporter", "n": 1, "controls": 11, "event": "scroll", "t": 1793336975.6305487}
+{"intent": "settings.teleporter", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336975.6325555}
+{"intent": "settings.teleporter", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336975.633552}
+{"intent": "settings.teleporter", "route": "text", "hits": 0, "usable": false, "query": "Quantum teleporter", "examples": [], "event": "route", "t": 1793336975.6341133}
+{"intent": "settings.teleporter", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336975.6341133}
+{"intent": "settings.teleporter", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336975.635217}
+{"intent": "settings.teleporter", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793336975.635217}
+{"intent": "settings.teleporter", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336975.6361303}
+{"intent": "settings.teleporter", "n": 2, "controls": 11, "event": "scroll", "t": 1793336982.2625613}
+{"intent": "settings.teleporter", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336982.2638028}
+{"intent": "settings.teleporter", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336982.2638028}
+{"intent": "settings.teleporter", "route": "text", "hits": 0, "usable": false, "query": "Quantum teleporter", "examples": [], "event": "route", "t": 1793336982.2653797}
+{"intent": "settings.teleporter", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336982.2664237}
+{"intent": "settings.teleporter", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336982.2669723}
+{"intent": "settings.teleporter", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793336982.2669723}
+{"intent": "settings.teleporter", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336982.2679532}
+{"intent": "settings.teleporter", "n": 3, "controls": 10, "event": "scroll", "t": 1793336989.0931253}
+{"intent": "settings.teleporter", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336989.0941281}
+{"intent": "settings.teleporter", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336989.0951273}
+{"intent": "settings.teleporter", "route": "text", "hits": 0, "usable": false, "query": "Quantum teleporter", "examples": [], "event": "route", "t": 1793336989.0951273}
+{"intent": "settings.teleporter", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336989.096128}
+{"intent": "settings.teleporter", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336989.096128}
+{"intent": "settings.teleporter", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793336989.096128}
+{"intent": "settings.teleporter", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793336989.0971315}
+{"intent": "settings.teleporter", "outcome": "failed-absent", "route": "none", "wasted": 0, "model_calls": 0, "detail": "every route was tried and none achieved the goal: resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0), scroll(1), resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0), scroll(2), resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0), scroll(3), resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0)", "event": "intent-end", "t": 1793336996.1197338}
+{"n": 4, "total": 5, "id": 4, "title": "4 - Another screen (Battery)", "say": "A different goal on a different screen, found by its text.", "expect": "success", "event": "scene", "t": 1793336997.721105}
+{"intent": "settings.battery", "goal": "Open the battery settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "looking_for": {"text": "Battery"}, "onscreen": ["Profile picture, double", "Search settings", "Network & internet Mobil", "Connected devices Blueto", "Apps Assistant, recent a", "Notifications Notificati", "Battery 100%", "Storage 33% used - 5.40", "Sound & vibration Volume"], "event": "intent-start", "t": 1793337009.7290666}
+{"intent": "settings.battery", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337009.7522707}
+{"intent": "settings.battery", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337009.7532108}
+{"intent": "settings.battery", "route": "text", "hits": 1, "usable": true, "query": "Battery", "examples": ["Battery 100%"], "event": "route", "t": 1793337009.7542117}
+{"intent": "settings.battery", "route": "text", "x0": 0.0, "y0": 0.7058333333333333, "x1": 1.0, "y1": 0.8020833333333334, "label": "Battery 100%", "event": "act", "t": 1793337009.7552097}
+{"intent": "settings.battery", "route": "text", "ok": true, "says": "", "event": "check", "t": 1793337021.6185443}
+{"intent": "settings.battery", "outcome": "success", "route": "text", "wasted": 0, "model_calls": 0, "detail": "recovered on text after: resource-id(0), content-desc(0)", "event": "intent-end", "t": 1793337023.2203484}
+{"n": 5, "total": 5, "id": 5, "title": "5 - Words changed, no model", "say": "The same changed wording as scene 2, but with the model switched off: rules alone cannot read it, so it stops. This is why the model rung exists.", "expect": "stop", "event": "scene", "t": 1793337024.8217497}
+{"intent": "settings.network", "goal": "Open the network and internet settings", "success": "", "controls": 9, "routes": ["resource-id", "content-desc", "text", "scoped", "learned", "semantic", "geometry"], "looking_for": {"text": "Connectivity"}, "onscreen": ["Profile picture, double", "Search settings", "Network & internet Mobil", "Connected devices Blueto", "Apps Assistant, recent a", "Notifications Notificati", "Battery 100%", "Storage 33% used - 5.40", "Sound & vibration Volume"], "event": "intent-start", "t": 1793337036.811364}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337036.8119028}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337036.8129199}
+{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "query": "Connectivity", "examples": [], "event": "route", "t": 1793337036.8129199}
+{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337036.8139198}
+{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337036.8149073}
+{"intent": "settings.network", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793337036.8149073}
+{"intent": "settings.network", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337036.8160198}
+{"intent": "settings.network", "n": 1, "controls": 11, "event": "scroll", "t": 1793337044.0167341}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337044.0187109}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337044.0197117}
+{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "query": "Connectivity", "examples": [], "event": "route", "t": 1793337044.0207112}
+{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337044.0207112}
+{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337044.0217106}
+{"intent": "settings.network", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793337044.0217106}
+{"intent": "settings.network", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337044.0227103}
+{"intent": "settings.network", "n": 2, "controls": 11, "event": "scroll", "t": 1793337051.1295946}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337051.1301365}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337051.1311321}
+{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "query": "Connectivity", "examples": [], "event": "route", "t": 1793337051.1321292}
+{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337051.1331308}
+{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337051.1331308}
+{"intent": "settings.network", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793337051.1341298}
+{"intent": "settings.network", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337051.1341298}
+{"intent": "settings.network", "n": 3, "controls": 10, "event": "scroll", "t": 1793337058.2991698}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337058.300278}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337058.3011723}
+{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "query": "Connectivity", "examples": [], "event": "route", "t": 1793337058.3031712}
+{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337058.3041687}
+{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337058.3041687}
+{"intent": "settings.network", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793337058.3051686}
+{"intent": "settings.network", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337058.3051686}
+{"intent": "settings.network", "n": 4, "controls": 10, "event": "scroll", "t": 1793337065.5761151}
+{"intent": "settings.network", "route": "resource-id", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337065.5781152}
+{"intent": "settings.network", "route": "content-desc", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337065.5784576}
+{"intent": "settings.network", "route": "text", "hits": 0, "usable": false, "query": "Connectivity", "examples": [], "event": "route", "t": 1793337065.5791159}
+{"intent": "settings.network", "route": "scoped", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337065.580118}
+{"intent": "settings.network", "route": "learned", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337065.5806267}
+{"intent": "settings.network", "route": "semantic", "hits": 0, "usable": true, "query": "", "examples": [], "event": "route", "t": 1793337065.5806267}
+{"intent": "settings.network", "route": "geometry", "hits": 0, "usable": false, "query": "", "examples": [], "event": "route", "t": 1793337065.5806267}
+{"intent": "settings.network", "outcome": "failed-absent", "route": "none", "wasted": 0, "model_calls": 0, "detail": "every route was tried and none achieved the goal: resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0), scroll(1), resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0), scroll(2), resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0), scroll(3), resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0), scroll(4), resource-id(0), content-desc(0), text(0), scoped(0), learned(0), geometry(0)", "event": "intent-end", "t": 1793337065.5816545}
+{"event": "run-end", "t": 1793337067.182611}

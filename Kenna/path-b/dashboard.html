@@ -83,6 +83,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 7px;b
   <span class="badge" id="model">model: not started</span>
   <label>Model<select id="sem"><option value="none">No model (rules only)</option><option value="offline" selected>Offline stand-in (word matching, NOT an AI)</option><option value="openrouter">OpenRouter (real model)</option><option value="anthropic">Anthropic (real model)</option></select></label>
   <label>Speed<select id="pace"><option value="0.5">Fast</option><option value="1.6" selected>Demo</option><option value="3">Slow</option></select></label>
+  <button id="voice" role="switch" aria-checked="false" title="Say each result aloud">Voice: off</button>
   <button id="fold" title="Collapse or expand every section">Collapse all</button>
   <button class="pri" id="go">&#9654; Run selected</button><button id="pause" disabled>&#10074;&#10074; Pause</button><button id="stop">Stop</button>
 </header>
@@ -117,6 +118,10 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 7px;b
   </div>
 </main>
 <script>
+let voiceOn=false;try{voiceOn=localStorage.getItem('kenna-voice')==='1'}catch(e){}
+const say=t=>{if(!voiceOn||!t||!window.speechSynthesis)return;speechSynthesis.speak(new SpeechSynthesisUtterance(t))};
+const voiceLine=(ok,goal)=>{const g=String(goal||'this step').replace(/\s+/g,' ').trim();return ok?'Done. '+g+'.':'I could not do this: '+g.charAt(0).toLowerCase()+g.slice(1)+'. I stopped instead of guessing. You may need to do it yourself.'};
+const paintVoice=()=>{const b=document.getElementById('voice');if(!b)return;b.textContent=voiceOn?'Voice: on':'Voice: off';b.setAttribute('aria-checked',voiceOn?'true':'false')};
 const ROUTES=["resource-id","content-desc","text","scoped","learned","semantic","geometry"];
 const NAMES={"resource-id":"id","content-desc":"label","text":"text","scoped":"container","learned":"remembered","semantic":"model","geometry":"position"};
 let runNoModel=false,since=0,run=false,sc,scenes=[],cur=null,sel=new Set(),stub=false,total=0;
@@ -142,12 +147,12 @@ function score(){$('s-exp').textContent=sc.exp+'/'+sc.done;$('s-ok').textContent
 function rows(){$('runres').innerHTML=sc.rows.map(r=>`<div class="res"><span>${esc(r.title)}</span><span class="g">${r.out==='success'?'completed':'stopped'} &middot; ${r.asExpected?'<span style="color:var(--ok)">as expected &#10003;</span>':'<span style="color:var(--bad)">not as expected &#10007;</span>'}</span></div>`).join('')}
 function on(e){
   switch(e.event){
-  case 'run-start': runNoModel=(e.model==='none');stub=!!e.stub;total=e.total||0;resetScore();prog();$('log').innerHTML='';$('result').className='result';ladderReset();live(true,'Running');
+  case 'run-start': if(window.speechSynthesis)speechSynthesis.cancel(); runNoModel=(e.model==='none');stub=!!e.stub;total=e.total||0;resetScore();prog();$('log').innerHTML='';$('result').className='result';ladderReset();live(true,'Running');
     $('model').textContent='model: '+e.model;$('model').className='badge '+(e.stub?'stub':(e.model==='none'?'':'live'));log(e.t,'run started, model = '+esc(e.model)); break;
   case 'scene': { const sd=scenes.find(x=>x.id===e.id); if(sd) e.expect=(sd.model&&runNoModel)?'stop':sd.expect; } cur=e;$('steps').innerHTML='';ladderReset();box(null);$('result').className='result';prog();
     document.querySelectorAll('.pick').forEach(p=>p.classList.remove('cur'));const pe=$('p-'+e.id);if(pe)pe.classList.add('cur');
     $('sceneInfo').innerHTML=`<span class="pill">test ${e.n} of ${e.total}</span>${expPill(e.expect)}<div class="t">${esc(e.title)}</div><p>${esc(e.say)}</p>`;think('Reading the screen...');log(e.t,'<b>'+esc(e.title)+'</b>'); break;
-  case 'intent-start': { const lf=e.looking_for||{}, keys=Object.keys(lf);
+  case 'intent-start': { window._goal=e.goal; const lf=e.looking_for||{}, keys=Object.keys(lf);
     const what=keys.length?keys.map(k=>`${k} <q>${esc(lf[k])}</q>`).join(', '):'no hints were taught';
     think(`Goal: <b>${esc(e.goal)}</b>`,`Taught to look for: ${what}. ${e.controls} controls are on screen${e.onscreen&&e.onscreen.length?': '+e.onscreen.map(esc).join(', ')+(e.controls>e.onscreen.length?', ...':''):''}.${e.success?' Success means: '+esc(e.success):''}`);
     step('n','&#9679;',`Goal: ${esc(e.goal)}. On screen now: ${(e.onscreen||[]).map(esc).join(', ')||'?'}`); break; }
@@ -172,7 +177,7 @@ function on(e){
   case 'act': box(e,'tap');window._last=e;think(`Tapping <b>${esc(e.label)}</b>`,`via way <b>${NAMES[e.route.split('[')[0]]}</b>, then checking the next screen.`);step('w','&#9758;',`Tapping <b>${esc(e.label)}</b> (way <b>${NAMES[e.route.split('[')[0]]}</b>), then checking the next screen.`);rung(e.route.split('[')[0],'try','tapped');log(e.t,'tap '+esc(e.label)); break;
   case 'check': { const r=e.route.split('[')[0]; box(window._last,e.ok?'ok':'bad'); rung(r,e.ok?'win':'lose',e.ok?'worked':'no effect');
     think(e.ok?'&#10003; Check passed':'&#10007; Check failed',e.ok?esc(e.says||''):'The screen did not change as expected. That tap counts as wrong; trying the next way.');step(e.ok?'y':'x',e.ok?'&#10003;':'&#10007;',e.ok?`Check passed${e.says?': '+esc(e.says):''}: the screen changed as expected.`:'Check failed: the screen did not change as expected, so that tap counts as wrong.');log(e.t,(e.ok?'check OK':'check FAILED')); break; }
-  case 'intent-end': { sc.wasted+=e.wasted;sc.calls+=e.model_calls;const ok=e.outcome==='success';ok?sc.ok++:sc.stop++;sc.done++;
+  case 'intent-end': { sc.wasted+=e.wasted;sc.calls+=e.model_calls;const ok=e.outcome==='success';ok?sc.ok++:sc.stop++;sc.done++;say(voiceLine(ok,window._goal));
     const asExp=cur&&((cur.expect==='success')===ok);if(asExp)sc.exp++;sc.rows.push({title:cur?cur.title:'',out:e.outcome,asExpected:asExp});score();rows();prog();box(null);
     const pe=cur&&$('p-'+cur.id);if(pe){pe.classList.remove('cur');pe.classList.add(asExp?'done-ok':'done-bad')}
     const n=e.detail.replace(/^.*none achieved the goal: /,'').split(', ').length;
@@ -182,7 +187,7 @@ function on(e){
     r.innerHTML=ok?`&#10003; Done via the <b>${NAMES[e.route.split('[')[0]]}</b> way<small>${e.wasted} wasted tap(s), ${e.model_calls} model call(s). ${asExp?'As expected.':'Not what was expected.'}</small>${note}`
       :`&#9888; Stopped honestly. Nothing was guessed.<small>Tried all ${n} ways and none found the control, so it told the user instead of tapping at random.${(scenes.find(x=>x.id===(cur&&cur.id))||{}).model&&runNoModel?' The wording changed and no model was selected, so nothing could read it. Select a model to see this pass.':''} ${asExp?'This is the expected result.':'This was NOT expected.'}</small>`;
     log(e.t,'<b>'+(ok?'success':'stopped honestly')+'</b>'); break; }
-  case 'run-end': log(e.t,'run finished'); think('Run finished.',sc.exp+' of '+sc.done+' tests came out as expected.');live(false,'Idle'); break;
+  case 'run-end': say('Run finished. '+sc.exp+' of '+sc.done+' tests came out as expected.'); log(e.t,'run finished'); think('Run finished.',sc.exp+' of '+sc.done+' tests came out as expected.');live(false,'Idle'); break;
   }
 }
 let isPaused=false;
@@ -200,6 +205,7 @@ $('go').onclick=async()=>{freshUi();
 $('sem').onchange=()=>renderPicks();
 $('pause').onclick=async()=>{await fetch(isPaused?'/resume':'/pause');setPaused(!isPaused)};
 $('stop').onclick=async()=>{await fetch('/stop');setPaused(false)};
+$('voice').onclick=()=>{voiceOn=!voiceOn;try{localStorage.setItem('kenna-voice',voiceOn?'1':'0')}catch(e){}paintVoice();if(!voiceOn&&window.speechSynthesis)speechSynthesis.cancel();else say('Voice on.')};paintVoice();
 $('all').onclick=()=>{scenes.forEach(s=>sel.add(s.id));renderPicks()};$('none').onclick=()=>{sel.clear();renderPicks()};
 
 const folded=new Set();try{(JSON.parse(localStorage.getItem('kenna-fold'))||[]).forEach(k=>folded.add(k))}catch(e){}
